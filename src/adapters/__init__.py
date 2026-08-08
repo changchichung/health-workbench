@@ -10,15 +10,8 @@ def register(adapter_cls):
 
 
 def get_adapters():
-    # 匯入時註冊（延遲載入避免循環相依）
-    try:
-        from . import nhi_json  # noqa: F401
-    except ImportError:
-        pass
-    try:
-        from . import apple_health  # noqa: F401
-    except ImportError:
-        pass
+    # 匯入時註冊（延遲載入避免循環相依）；載入失敗直接浮出，不得靜默
+    from . import apple_health, nhi_json  # noqa: F401
     return list(_REGISTRY)
 
 

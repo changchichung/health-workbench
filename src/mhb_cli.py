@@ -96,7 +96,14 @@ def main(argv=None):
 
     args = parser.parse_args(argv)
     args.db.parent.mkdir(parents=True, exist_ok=True)
-    return args.func(args)
+    import sqlite3
+    try:
+        return args.func(args)
+    except sqlite3.DatabaseError as e:
+        print(f"資料庫無法開啟（{args.db}）：{e}\n"
+              f"若檔案損壞：原始下載檔都在，可將其移走後以 mhb import 重建；"
+              f"或還原你的備份副本。", file=sys.stderr)
+        return 4
 
 
 if __name__ == "__main__":

@@ -37,3 +37,26 @@ def test_unknown_format_error(tmp_path):
     r = run_cli("--db", str(tmp_path / "s.sqlite"), "import", str(f))
     assert r.returncode != 0
     assert "支援" in (r.stderr + r.stdout)  # 明確列出支援格式
+
+
+def test_corrupt_db_friendly_error(tmp_path):
+    bad = tmp_path / "bad.sqlite"
+    bad.write_text("not a database")
+    r = run_cli("--db", str(bad), "status")
+    assert r.returncode == 4
+    assert "重建" in r.stderr and "Traceback" not in r.stderr
+
+
+def test_zip_import(tmp_path):
+    import shutil, zipfile
+    from pathlib import Path as P
+    src = P(__file__).parent / "fixtures" / "apple_sample.xml"
+    exp = tmp_path / "apple_health_export"
+    exp.mkdir(); shutil.copy(src, exp / "輸出.xml")
+    zpath = tmp_path / "export.zip"
+    with zipfile.ZipFile(zpath, "w") as z:
+        z.write(exp / "輸出.xml", "apple_health_export/輸出.xml")
+    r = run_cli("--db", str(tmp_path / "z.sqlite"), "import", str(zpath),
+                "--no-rebuild", "--yes")
+    assert r.returncode == 0
+    assert "輸出.xml" in r.stdout  # 中文檔名無 mojibake

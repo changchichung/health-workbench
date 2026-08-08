@@ -19,6 +19,14 @@ from . import register
 ADAPTER_VERSION = "1.0.0"
 
 
+def _fix_zip_name(name):
+    """zip 未標 UTF-8 旗標時，zipfile 以 cp437 解碼中文檔名會亂碼；嘗試還原。"""
+    try:
+        return name.encode("cp437").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return name
+
+
 class _ZipMember:
     """zip 成員串流的 context manager：關閉時連同 ZipFile 一併關閉。"""
 
@@ -120,7 +128,7 @@ class AppleHealthAdapter:
             for name in names:
                 opener = lambda n=name: _ZipMember(path, n)
                 if check(opener):
-                    return opener, f"{path.name}:{name}"
+                    return opener, f"{path.name}:{_fix_zip_name(name)}"
         if path.is_dir():
             for child in sorted(path.glob("*.xml")):
                 if "cda" in child.name.lower():
