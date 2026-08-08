@@ -1,0 +1,13 @@
+data/
+phase0/output/
+*.sqlite
+*.db
+
+# Spectra app data
+.spectra/
+*.rej
+*.orig
+.DS_Store
+.gstack/
+__pycache__/
+*.pyc
