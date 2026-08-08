@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HealthData locale="zh_TW">
+  <Record type="HKQuantityTypeIdentifierBodyMass" sourceName="測試體重計" unit="kg" startDate="2024-01-01 08:00:00 +0800" endDate="2024-01-01 08:00:00 +0800" value="70.5"/>
+  <Record type="HKQuantityTypeIdentifierBodyMass" sourceName="測試體重計" unit="kg" startDate="2024-01-02 08:00:00 +0800" endDate="2024-01-02 08:00:00 +0800" value="70.2"/>
+  <Record type="HKQuantityTypeIdentifierBodyMass" sourceName="測試體重計" unit="kg" startDate="2024-01-03 08:00:00 +0800" endDate="2024-01-03 08:00:00 +0800" value="8.6"/>
+  <Record type="HKQuantityTypeIdentifierBodyMass" sourceName="測試體重計" unit="kg" startDate="1970-01-02 00:00:00 +0800" endDate="1970-01-02 00:00:00 +0800" value="70.1"/>
+  <Record type="HKQuantityTypeIdentifierBodyFatPercentage" sourceName="測試體重計" unit="%" startDate="2024-01-01 08:00:00 +0800" endDate="2024-01-01 08:00:00 +0800" value="0.255"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="測試手錶" unit="count/min" startDate="2024-01-01 09:00:00 +0800" endDate="2024-01-01 09:00:00 +0800" value="66"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="測試手錶" unit="count/min" startDate="2024-01-01 09:00:00 +0800" endDate="2024-01-01 09:00:00 +0800" value="66"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="測試手機" unit="count" startDate="2024-01-01 10:00:00 +0800" endDate="2024-01-01 10:00:00 +0800" value="6000"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="測試手錶" unit="count" startDate="2024-01-01 11:00:00 +0800" endDate="2024-01-01 11:00:00 +0800" value="7500"/>
+  <Record type="HKQuantityTypeIdentifierEnvironmentalAudioExposure" sourceName="測試手錶" unit="dBASPL" startDate="2024-01-01 12:00:00 +0800" endDate="2024-01-01 12:00:00 +0800" value="60"/>
+  <Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30.5" sourceName="測試手錶" startDate="2024-01-05 07:00:00 +0800" endDate="2024-01-05 07:30:00 +0800"/>
+</HealthData>
