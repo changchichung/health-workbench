@@ -1,0 +1,283 @@
+# 檢驗項目 knowledge 對照表（D4/D5）
+# 每條目六欄位必填；別名表承載跨院所名稱正規化；說明為非結論式用語。
+# 有意識保留 unmapped：PS、B/C（項目身分不確定，待查證後再收錄）。
+
+- normalized_name: 'WBC'
+  aliases: []
+  description: '白血球計數（White Blood Cell count），全血球計數（CBC）項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'RBC'
+  aliases: []
+  description: '紅血球計數（Red Blood Cell count），全血球計數（CBC）項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Hemoglobin'
+  aliases: ['Hb', 'HB']
+  description: '血紅素（Hemoglobin），全血球計數（CBC）項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Hematocrit'
+  aliases: ['Hct', 'HCT']
+  description: '血比容（Hematocrit），全血球計數（CBC）項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'PLT'
+  aliases: []
+  description: '血小板計數（Platelet count），全血球計數（CBC）項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'MCV'
+  aliases: []
+  description: '平均紅血球容積（Mean Corpuscular Volume）。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'MCH'
+  aliases: []
+  description: '平均紅血球血紅素量（Mean Corpuscular Hemoglobin）。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'MCHC'
+  aliases: []
+  description: '平均紅血球血紅素濃度（Mean Corpuscular Hemoglobin Concentration）。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'RDW-CV'
+  aliases: []
+  description: '紅血球分布寬度變異係數（Red cell Distribution Width, CV）。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'RDW-SD'
+  aliases: []
+  description: '紅血球分布寬度標準差（Red cell Distribution Width, SD）。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Neutrophil'
+  aliases: ['Neut']
+  description: '嗜中性球比例（Neutrophil），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Segmented Neutrophil'
+  aliases: ['Seg']
+  description: '分葉核嗜中性球比例（Segmented Neutrophil），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Band'
+  aliases: []
+  description: '帶狀核嗜中性球比例（Band form Neutrophil），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Lymphocyte'
+  aliases: ['Lym', 'Lym.']
+  description: '淋巴球比例（Lymphocyte），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Monocyte'
+  aliases: ['Mono', 'Mono.']
+  description: '單核球比例（Monocyte），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Eosinophil'
+  aliases: ['Eos', 'Eos.']
+  description: '嗜酸性球比例（Eosinophil），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Basophil'
+  aliases: ['Baso.']
+  description: '嗜鹼性球比例（Basophil），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Atypical Lymphocyte'
+  aliases: ['Aty.Lym.']
+  description: '非典型淋巴球比例（Atypical Lymphocyte），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Blast'
+  aliases: []
+  description: '芽細胞比例（Blast），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Metamyelocyte'
+  aliases: ['Meta']
+  description: '晚幼粒細胞比例（Metamyelocyte），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Myelocyte'
+  aliases: ['Myelo.']
+  description: '中幼粒細胞比例（Myelocyte），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Promyelocyte'
+  aliases: ['Promyl.']
+  description: '早幼粒細胞比例（Promyelocyte），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Normoblast'
+  aliases: ['Normobl.']
+  description: '有核紅血球（Normoblast），週邊血液分類計數紀錄項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Plasma Cell'
+  aliases: ['PlasmaCell']
+  description: '漿細胞比例（Plasma Cell），白血球分類計數項目之一。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'AFP'
+  aliases: []
+  description: '甲型胎兒蛋白（Alpha-Fetoprotein），血清檢驗項目。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'CEA'
+  aliases: []
+  description: '癌胚抗原（Carcinoembryonic Antigen），血清檢驗項目。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'CA 19-9'
+  aliases: ['CA 199']
+  description: '醣類抗原 19-9（Carbohydrate Antigen 19-9），血清檢驗項目。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'CRP'
+  aliases: []
+  description: 'C 反應蛋白（C-Reactive Protein），血清檢驗項目。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'ALT'
+  aliases: []
+  description: '丙胺酸轉胺酶（Alanine Aminotransferase，亦稱 GPT），肝功能相關檢驗項目。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'AST'
+  aliases: []
+  description: '天門冬胺酸轉胺酶（Aspartate Aminotransferase，亦稱 GOT），肝功能相關檢驗項目。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Total Bilirubin'
+  aliases: ['T. Bili']
+  description: '總膽紅素（Total Bilirubin）。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Lipase'
+  aliases: []
+  description: '脂肪酶（Lipase）。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Blood Urea Nitrogen'
+  aliases: ['BUN', 'UN']
+  description: '血中尿素氮（Blood Urea Nitrogen），腎功能相關檢驗項目。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Creatinine'
+  aliases: ['CRE', 'Cr']
+  description: '肌酸酐（Creatinine），腎功能相關檢驗項目。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'eGFR (CKD-EPI)'
+  aliases: []
+  description: '以 CKD-EPI 公式估算之腎絲球過濾率。不同公式之估算值不併入同一趨勢線。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'eGFR (MDRD)'
+  aliases: []
+  description: '以 MDRD 公式估算之腎絲球過濾率。不同公式之估算值不併入同一趨勢線。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'eGFR Male'
+  aliases: []
+  description: '院所報告之腎絲球過濾率變體（報告名稱標示 Male）。與其他 eGFR 公式各自獨立成組。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Hemolysis'
+  aliases: []
+  description: '檢體溶血指標（specimen index），反映檢體狀態而非身體數值。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Icterus'
+  aliases: []
+  description: '檢體黃疸指標（specimen index），反映檢體狀態而非身體數值。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'
+
+- normalized_name: 'Lipemia'
+  aliases: []
+  description: '檢體脂血指標（specimen index），反映檢體狀態而非身體數值。 本工具僅整理與顯示紀錄，數值意義請與醫師或醫檢師確認。'
+  source_name: '衛生福利部中央健康保險署（健康存摺檢驗(查)結果資料說明）'
+  source_url: 'https://www.nhi.gov.tw/ch/cp-7395-567d7-3255-1.html'
+  cited_date: '2026-08-08'

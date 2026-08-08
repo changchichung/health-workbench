@@ -25,14 +25,32 @@ def cmd_status(args):
 
 
 def cmd_quality(args):
+    from src.knowledge.drugs import DrugLookup
+    from src.knowledge.labs import stale_entries
     from src.quality.quality_report import build_full, render_text
     from src.store.db import Store
     store = Store(args.db)
-    report = build_full(store)
+    stale = stale_entries()
+    lookup = DrugLookup(args.db)
+    meta = lookup.meta()
+    lookup.close()
+    if meta:
+        from datetime import date, datetime
+        updated = datetime.strptime(meta["updated_at"], "%Y-%m-%d").date()
+        if (date.today() - updated).days > 365:
+            stale.append({"normalized_name": "(藥品品項快取)",
+                          "cited_date": meta["updated_at"]})
+    report = build_full(store, stale_knowledge=stale)
     print(render_text(report))
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     store.close()
+    return 0
+
+
+def cmd_knowledge(args):
+    from src.knowledge.drugs import update_cache
+    update_cache(args.db, source=args.source)
     return 0
 
 
@@ -65,6 +83,12 @@ def main(argv=None):
 
     p_status = sub.add_parser("status", help="顯示 schema 版本與各表筆數")
     p_status.set_defaults(func=cmd_status)
+
+    p_knowledge = sub.add_parser("knowledge", help="knowledge 對照維護")
+    p_knowledge.add_argument("action", choices=["update"], help="update：下載藥品品項快取")
+    p_knowledge.add_argument("--source", type=Path, default=None,
+                             help="改用本地 CSV（離線/測試用）")
+    p_knowledge.set_defaults(func=cmd_knowledge)
 
     p_quality = sub.add_parser("quality", help="輸出全庫品質報告（唯讀）")
     p_quality.add_argument("--json", action="store_true", help="同時輸出 JSON 結構")

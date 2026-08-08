@@ -290,6 +290,10 @@ class NhiJsonAdapter:
                 sections[sec] = {"status": "UNKNOWN_SECTION", "records": len(bdata[sec])}
 
         # 醫囑對帳（重複匯入時 inserted 為 0 屬正常，僅首次驗證）
+        # 檢驗名稱正規化（D5）：依 labs.yaml 別名表重算全部 lab_results
+        from src.knowledge.labs import apply_normalization
+        apply_normalization(store)
+
         med_inserted = store.stats["inserted"].get("medications", 0)
         reconciliation = {"expected_in_file": med_expected, "inserted_new": med_inserted,
                           "note": "重複匯入時 inserted_new < expected_in_file 為正常（紀錄已存在）"}
