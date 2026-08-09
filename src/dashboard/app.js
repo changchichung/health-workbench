@@ -272,6 +272,8 @@
         <span class="note" style="margin-left:auto">${open ? "▴" : "▾"}</span>
       </div>
       ${open && html`<div class="evbody">
+        ${!m.drug_zh && html`<p class="note"><span class="flag">品項檔未對照</span>
+          顯示原始醫囑名稱（診療項目與中藥不在西藥品項檔範圍）</p>`}
         ${m.ingredient && html`<p class="note">成分：${m.ingredient}
           ${m.leaflet_url && html`｜<a href=${m.leaflet_url} target="_blank" rel="noopener">仿單↗</a>`}</p>`}
         <${DispenseTimeline} items=${g.items} />

@@ -178,14 +178,17 @@ class AppleHealthAdapter:
             store.close()
 
     def _parse(self, store, opener, pid, doc_id):
-        scanned = workouts = 0
+        scanned = workouts = errors = 0
         with opener() as f:
             for ev, el in ET.iterparse(f, events=("end",)):
                 if el.tag == "Record":
                     t = el.get("type")
                     if t in WANTED:
                         scanned += 1
-                        self._insert_record(store, pid, doc_id, t, el)
+                        try:
+                            self._insert_record(store, pid, doc_id, t, el)
+                        except Exception:  # noqa: BLE001 — 逐筆防線
+                            errors += 1
                 elif el.tag == "Workout":
                     workouts += 1
                     store.insert_apple_workout(
@@ -197,7 +200,7 @@ class AppleHealthAdapter:
                         duration_min=_to_float(el.get("duration")),
                         source_name=el.get("sourceName"))
                 el.clear()
-        return {"records": scanned, "workouts": workouts}
+        return {"records": scanned, "workouts": workouts, "parse_errors": errors}
 
     def _insert_record(self, store, pid, doc_id, t, el):
         type_zh = WANTED[t]

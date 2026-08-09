@@ -128,3 +128,18 @@ def test_missing_masked_id_abort(tmp_path):
     s = Store(db)
     assert s.table_counts() == before
     s.close()
+
+
+def test_partial_failure_continues(tmp_path):
+    """單筆壞紀錄不中止整批：其餘入庫、錯誤記入品質報告（契約）。"""
+    data = json.loads(FIXTURE.read_bytes().decode("utf-8-sig"))
+    data["myhealthbank"]["bdata"]["r7"][0]["r7.11"] = {"壞": ["結構"]}
+    bad = tmp_path / "partial.json"
+    bad.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    rc = NhiJsonAdapter().import_file(bad, db_path=tmp_path / "p.sqlite", assume_profile=True)
+    assert rc == 0  # 續行完成
+    s = Store(tmp_path / "p.sqlite")
+    assert s.con.execute("SELECT COUNT(*) FROM lab_results").fetchone()[0] == 1  # 另一筆有進
+    assert s.con.execute("SELECT COUNT(*) FROM encounters").fetchone()[0] == 5  # 其他節區不受影響
+    stats = s.con.execute("SELECT import_stats FROM source_documents").fetchone()[0]
+    s.close()

@@ -1,6 +1,6 @@
 """health-database schema：全表 profile_id、來源追溯、quality_flags、版本化。"""
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 DDL = """
 CREATE TABLE IF NOT EXISTS schema_version(
@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS medications(
     source_index INTEGER NOT NULL,
     quality_flags TEXT NOT NULL DEFAULT '',
     UNIQUE(encounter_id, section, source_index));
+CREATE INDEX IF NOT EXISTS idx_medications_profile ON medications(profile_id, encounter_id);
 
 CREATE TABLE IF NOT EXISTS lab_results(
     id INTEGER PRIMARY KEY,
@@ -179,6 +180,8 @@ CREATE TABLE IF NOT EXISTS apple_workouts(
 # 前向遷移：{來源版本: [SQL, ...]}，逐版執行至 SCHEMA_VERSION
 MIGRATIONS = {
     1: ["ALTER TABLE source_documents ADD COLUMN import_stats TEXT"],
+    2: ["CREATE INDEX IF NOT EXISTS idx_medications_profile"
+        " ON medications(profile_id, encounter_id)"],
 }
 
 # 帶指紋合併語意的健保紀錄表（碰撞防禦與 superseded 偵測作用對象）

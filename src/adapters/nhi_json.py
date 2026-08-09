@@ -123,6 +123,16 @@ class NhiJsonAdapter:
 
         sections = {}
         unknown_fields = {}
+        parse_errors = []
+
+        def guard(sec, i, fn):
+            """單筆解析失敗：記錄後續行，NEVER 讓整批中止或靜默丟棄。"""
+            try:
+                fn()
+                return True
+            except Exception as e:  # noqa: BLE001 — 逐筆防線，錯誤全記入品質報告
+                parse_errors.append(f"{sec}[{i}] {type(e).__name__}: {e}")
+                return False
 
         def note_unknown(sec, rec):
             known = KNOWN_FIELDS.get(sec, {})
@@ -143,6 +153,10 @@ class NhiJsonAdapter:
                 continue
             n_out = 0
             for i, rec in enumerate(rows):
+              def _one(rec=rec, i=i, sec=sec, etype=etype, dkey=dkey, fname_k=fname_k,
+                       fcode_k=fcode_k, dxc_k=dxc_k, dxn_k=dxn_k, copay_k=copay_k,
+                       pts_k=pts_k, seq_k=seq_k):
+                nonlocal n_out, med_expected
                 extra = note_unknown(sec, rec)
                 d = norm_date(rec.get(dkey))
                 rec_type = etype
@@ -180,6 +194,7 @@ class NhiJsonAdapter:
                             days_supply=to_num(med.get(days_key)),
                             tooth_code=med.get(f"{sub_key}.4") if sec == "r3" else None,
                             tooth_name=med.get(f"{sub_key}.5") if sec == "r3" else None)
+              guard(sec, i, _one)
             sections[sec] = {"status": "parsed", "records": len(rows), "inserted": n_out}
 
         # --- r7 檢驗 ---
@@ -188,6 +203,7 @@ class NhiJsonAdapter:
             sections["r7"] = {"status": "no_data", "records": 0}
         else:
             for i, rec in enumerate(rows):
+              def _one(rec=rec, i=i):
                 note_unknown("r7", rec)
                 vt = rec.get("r7.11")
                 vnum = to_num(vt)
@@ -208,6 +224,7 @@ class NhiJsonAdapter:
                              "test_name_raw": rec.get("r7.10"),
                              "value_text": vt, "value_numeric": vnum,
                              "ref_range": rec.get("r7.12")})
+              guard("r7", i, _one)
             sections["r7"] = {"status": "parsed", "records": len(rows)}
 
         # --- r8 影像病理 ---
@@ -216,6 +233,7 @@ class NhiJsonAdapter:
             sections["r8"] = {"status": "no_data", "records": 0}
         else:
             for i, rec in enumerate(rows):
+              def _one(rec=rec, i=i):
                 note_unknown("r8", rec)
                 store.insert_fp_record(
                     "reports", rec, profile_id=pid, doc_id=doc_id, section="r8",
@@ -225,6 +243,7 @@ class NhiJsonAdapter:
                              "facility_name": rec.get("r8.4"),
                              "order_code": rec.get("r8.8"), "order_name": rec.get("r8.9"),
                              "report_text": rec.get("r8.10")})
+              guard("r8", i, _one)
             sections["r8"] = {"status": "parsed", "records": len(rows)}
 
         # --- r6 疫苗 ---
@@ -233,6 +252,7 @@ class NhiJsonAdapter:
             sections["r6"] = {"status": "no_data", "records": 0}
         else:
             for i, rec in enumerate(rows):
+              def _one(rec=rec, i=i):
                 note_unknown("r6", rec)
                 store.insert_fp_record(
                     "immunizations", rec, profile_id=pid, doc_id=doc_id, section="r6",
@@ -240,6 +260,7 @@ class NhiJsonAdapter:
                     columns={"date": norm_date(rec.get("r6.1")),
                              "vaccine_name": rec.get("r6.3"),
                              "facility_name": rec.get("r6.5")})
+              guard("r6", i, _one)
             sections["r6"] = {"status": "parsed", "records": len(rows)}
 
         # --- r10 成健 ---
@@ -248,6 +269,7 @@ class NhiJsonAdapter:
             sections["r10"] = {"status": "no_data", "records": 0}
         else:
             for i, rec in enumerate(rows):
+              def _one(rec=rec, i=i):
                 extra = {fm.R10.get(k, k): v for k, v in rec.items() if v not in (None, "")}
                 store.insert_fp_record(
                     "body_measurements", rec, profile_id=pid, doc_id=doc_id,
@@ -260,6 +282,7 @@ class NhiJsonAdapter:
                              "systolic": to_num(rec.get("r10.10")),
                              "diastolic": to_num(rec.get("r10.11")),
                              "extra_json": json.dumps(extra, ensure_ascii=False)})
+              guard("r10", i, _one)
             sections["r10"] = {"status": "parsed", "records": len(rows)}
 
         # --- r11 癌篩 ---
@@ -268,11 +291,14 @@ class NhiJsonAdapter:
             sections["r11"] = {"status": "no_data", "records": 0}
         else:
             for i, rec in enumerate(rows):
+              def _one(rec=rec, i=i):
+                note_unknown("r11", rec)
                 store.insert_fp_record(
                     "cancer_screenings", rec, profile_id=pid, doc_id=doc_id,
                     section="r11", source_index=i,
                     columns={"category": rec.get("r11.1"), "item_name": rec.get("r11.2"),
                              "detail_json": json.dumps(rec.get("r11_1", []), ensure_ascii=False)})
+              guard("r11", i, _one)
             sections["r11"] = {"status": "parsed", "records": len(rows)}
 
         # --- 其餘節區與未知節區 ---
@@ -304,6 +330,7 @@ class NhiJsonAdapter:
             source_info={"filename": path.name, "sha256": sha256,
                          "adapter": "nhi_json", "adapter_version": ADAPTER_VERSION,
                          "unknown_fields": unknown_fields,
+                         "parse_errors": parse_errors,
                          "medication_reconciliation": reconciliation})
         print(render_text(report))
         return 0

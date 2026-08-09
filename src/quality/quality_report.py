@@ -119,6 +119,12 @@ def render_text(report):
     for t, (lo, hi) in report["date_ranges"].items():
         if lo:
             lines.append(f"  {t} 期間：{lo} ～ {hi}")
+    perr = src.get("parse_errors") if isinstance(src, dict) else None
+    if perr:
+        n = perr if isinstance(perr, int) else len(perr)
+        lines.append(f"解析錯誤（已續行，該筆未入庫）：{n} 筆")
+        if isinstance(perr, list):
+            lines.extend(f"  ! {e}" for e in perr[:5])
     if report["quality_flags"]:
         lines.append("品質旗標：" + "、".join(
             f"{k}×{v}" for k, v in sorted(report["quality_flags"].items())))
