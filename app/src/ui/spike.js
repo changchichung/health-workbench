@@ -37,6 +37,7 @@ function scan(buf, sink) {
   for (;;) {
     const lt = buf.indexOf("<", pos);
     if (lt === -1) return buf.length;
+    if (buf.length - lt < 9) return lt; // 殘尾不足以判定標籤名，留給下一 chunk（差分實測修正）
     const rest = buf.slice(lt + 1, lt + 9);
     const isRecord = rest.startsWith("Record ");
     const isWorkout = rest.startsWith("Workout ");

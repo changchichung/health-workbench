@@ -75,6 +75,10 @@ function scan(buf, sink) {
   for (;;) {
     const lt = buf.indexOf("<", pos);
     if (lt === -1) return buf.length;
+    // 「<」距 buffer 尾不足以判定標籤名（如殘尾「<Reco」）→ 保留給下一 chunk。
+    // 漏此檢查會把切在標籤名中間的 Record 當雜訊丟棄（真實 百 MB 量級 檔實測踩中，
+    // 差分對帳 數十萬 vs 數十萬 抓出；tests/adapters/apple_boundary.test.mjs 回歸）
+    if (buf.length - lt < 9) return lt;
     const rest = buf.slice(lt + 1, lt + 9);
     const isRecord = rest.startsWith("Record ") || rest.startsWith("Record\t");
     const isWorkout = rest.startsWith("Workout ");
