@@ -234,7 +234,7 @@
   /* ---------- 用藥（分類＋可展開處方時間軸） ---------- */
   const MED_CATS = [["drug", "藥品"], ["tcm", "中醫用藥"], ["order", "診療項目與其他"]];
 
-  function MedGroup({ g, open, onToggle }) {
+  function MedGroup({ g, open, onToggle, go }) {
     const m = g.m;
     const days = g.items.reduce((s, x) => s + (x.days_supply || 0), 0);
     const facs = [...new Set(g.items.map((x) => x.facility_name))];
@@ -248,17 +248,20 @@
         ${m.ingredient && html`<p class="note">成分：${m.ingredient}
           ${m.leaflet_url && html`｜<a href=${m.leaflet_url} target="_blank" rel="noopener">仿單↗</a>`}</p>`}
         <${DispenseTimeline} items=${g.items} />
-        <table><tr><th>日期</th><th>院所</th><th>總量</th><th>天數</th></tr>
-          ${g.items.map((x) => html`<tr><td class="dt">${x.date}</td>
+        <table><tr><th>日期</th><th>院所</th><th>總量</th><th>天數</th><th></th></tr>
+          ${g.items.map((x) => html`<tr class="rowlink"
+              onClick=${() => go("timeline", { enc: x.encounter_id })}>
+            <td class="dt">${x.date}</td>
             <td class="dt">${x.facility_name}</td>
-            <td class="num">${x.total_qty ?? ""}</td><td class="num">${x.days_supply ?? ""}</td></tr>`)}
+            <td class="num">${x.total_qty ?? ""}</td><td class="num">${x.days_supply ?? ""}</td>
+            <td class="dt">看診紀錄 ›</td></tr>`)}
         </table>
         <p class="note">院所：${facs.join("、")}</p>
       </div>`}
     </div>`;
   }
 
-  function Meds({ focus }) {
+  function Meds({ focus, go }) {
     const groups = useMemo(() => {
       const g = {};
       DATA.medications.forEach((m) => {
@@ -280,7 +283,7 @@
       <p class="note">藥品資訊來自健保用藥品項檔（版本
         ${DATA.meta.drug_cache ? DATA.meta.drug_cache.updated_at : "未建快取"}）；
         點列展開處方時間軸。</p>
-      ${byCat(cat).map((g) => html`<${MedGroup} g=${g} open=${openKey === g.key}
+      ${byCat(cat).map((g) => html`<${MedGroup} g=${g} open=${openKey === g.key} go=${go}
         onToggle=${() => setOpenKey(openKey === g.key ? null : g.key)} />`)}
     </section>`;
   }
@@ -401,7 +404,7 @@
     const view = q.trim() ? html`<${Search} q=${q} go=${go} />`
       : tab === "overview" ? html`<${Overview} go=${go} />`
       : tab === "timeline" ? html`<${Timeline} key=${"t" + JSON.stringify(focus)} focus=${focus} />`
-      : tab === "meds" ? html`<${Meds} key=${"m" + JSON.stringify(focus)} focus=${focus} />`
+      : tab === "meds" ? html`<${Meds} key=${"m" + JSON.stringify(focus)} focus=${focus} go=${go} />`
       : html`<${Trends} key=${"r" + JSON.stringify(focus)} focus=${focus} />`;
     return html`<div>
       <header>
