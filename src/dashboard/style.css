@@ -96,4 +96,12 @@ th { color: var(--ink2); font-weight: 500; font-size: .85em; }
 a { color: var(--accent); }
 details summary { cursor: pointer; padding: 8px 0; min-height: 32px; }
 header .disclaimer { font-size: .82em; color: var(--ink2); margin: 2px 0 0; }
+.catbtn { font: 600 14px -apple-system, "PingFang TC", sans-serif; min-height: 44px;
+  padding: 8px 16px; border: none; border-radius: 18px; background: var(--card);
+  color: var(--ink); cursor: pointer; box-shadow: var(--shadow); }
+.catbtn.on { background: var(--accent); color: #fff; }
+.srow { display: flex; align-items: center; gap: 8px; padding: 11px 6px;
+  border-bottom: 0.5px solid var(--line); border-radius: 8px; }
+.srow:last-child { border-bottom: none; }
+.go { margin-left: auto; color: var(--ink2); font-size: 1.2em; }
 header .disclaimer b { color: var(--warn); }

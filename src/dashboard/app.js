@@ -15,6 +15,14 @@
   };
   const fmtType = (t) => (TYPE_META[t] || [t, "var(--ink2)"])[0];
   const typeColor = (t) => (TYPE_META[t] || [t, "var(--ink2)"])[1];
+  const medKey = (m) => m.order_code || m.order_name;
+
+  /* 醫令分類：西醫藥品（品項檔命中）/ 中醫用藥 / 診療項目與其他 */
+  function medCategory(m) {
+    if (m.drug_zh) return "drug";
+    if ((m.section_hint || "").startsWith("r9")) return "tcm";
+    return "order";
+  }
 
   /* ---------- 共用元件 ---------- */
   function latestAndDelta(series, daysBack) {
@@ -92,6 +100,29 @@
       })}</svg></div>`;
   }
 
+  /* 處方時間軸：全資料期間為 x 軸，每次處方一根長條（高度＝給藥日數） */
+  function DispenseTimeline({ items }) {
+    const dated = items.filter((m) => m.date).sort((a, b) => (a.date < b.date ? -1 : 1));
+    if (!dated.length) return html`<p class="note">無日期資料</p>`;
+    const t0 = new Date(DATA.meta.date_min).getTime();
+    const t1 = new Date(DATA.meta.date_max).getTime();
+    const W = 820, H = 90, PL = 8, PB = 20, PT = 8;
+    const x = (d) => PL + ((new Date(d).getTime() - t0) / Math.max(t1 - t0, 1)) * (W - PL - 12);
+    const maxDays = Math.max(...dated.map((m) => m.days_supply || 1), 1);
+    const bh = (d) => Math.max(((d || 1) / maxDays) * (H - PB - PT), 3);
+    const years = [];
+    for (let yy = new Date(DATA.meta.date_min).getFullYear();
+         yy <= new Date(DATA.meta.date_max).getFullYear(); yy++) years.push(yy);
+    return html`<div class="chartwrap"><svg viewBox="0 0 ${W} ${H}" width=${W} role="img">
+      <line x1=${PL} y1=${H - PB} x2=${W - 8} y2=${H - PB} class="grid" />
+      ${years.map((yy) => html`<text x=${Math.max(x(yy + "-01-01"), PL)} y=${H - 5}
+          class="ax">${yy}</text>`)}
+      ${dated.map((m) => html`<rect x=${x(m.date) - 2} y=${H - PB - bh(m.days_supply)}
+          width="4" rx="1.5" height=${bh(m.days_supply)} fill="var(--s1)">
+        <title>${m.date}：${m.days_supply || "?"} 日份（${m.facility_name}）</title></rect>`)}
+    </svg></div><p class="note">每根長條＝一次處方，高度＝給藥日數（滑過看明細）</p>`;
+  }
+
   /* ---------- 總覽（洞察式摘要卡） ---------- */
   function Overview({ go }) {
     const c = DATA.meta.counts;
@@ -130,14 +161,15 @@
           <${LineChart} unit="kg" series=${[{ label: "體重", color: "var(--s1)",
             points: weightYear }]} />
         </${Card}>
-        <${Card} wide icon="🧪" color="var(--s3)" title="最新檢驗（點入趨勢頁看全部）">
-          <table>${recentLabs.map((l) => html`<tr class="rowlink" onClick=${() => go("trends")}>
+        <${Card} wide icon="🧪" color="var(--s3)" title="最新檢驗（點入看趨勢）">
+          <table>${recentLabs.map((l) => html`<tr class="rowlink"
+              onClick=${() => go("trends", { lab: l.name })}>
             <td>${l.name}</td><td class="num">${l.value_text}</td>
             <td class="dt">${l.ref_range || ""}</td><td class="dt">${l.test_date}</td></tr>`)}
           </table>
         </${Card}>
         <${Card} wide icon="📅" color="var(--accent)" title="最近就醫">
-          <table>${encs.map((e) => html`<tr class="rowlink" onClick=${() => go("timeline", e.id)}>
+          <table>${encs.map((e) => html`<tr class="rowlink" onClick=${() => go("timeline", { enc: e.id })}>
             <td class="dt">${e.date}</td><td><${Chip} type=${e.type} /></td>
             <td>${e.facility_name}</td><td class="dt">${e.dx_name || ""}</td></tr>`)}</table>
         </${Card}>
@@ -151,25 +183,28 @@
   }
 
   /* ---------- 時間軸 ---------- */
-  function Timeline({ focusId }) {
+  function Timeline({ focus }) {
     const [type, setType] = useState("");
     const [fac, setFac] = useState("");
-    const [open, setOpen] = useState(focusId || null);
+    const [open, setOpen] = useState((focus && focus.enc) || null);
+    // 院所選單跟著已選類型連動
     const facilities = useMemo(
-      () => [...new Set(DATA.encounters.map((e) => e.facility_name).filter(Boolean))].sort(), []);
+      () => [...new Set(DATA.encounters.filter((e) => !type || e.type === type)
+        .map((e) => e.facility_name).filter(Boolean))].sort(), [type]);
+    const effFac = facilities.includes(fac) ? fac : "";
     const list = DATA.encounters.filter(
-      (e) => (!type || e.type === type) && (!fac || e.facility_name === fac));
+      (e) => (!type || e.type === type) && (!effFac || e.facility_name === effFac));
     const medById = useMemo(() => {
       const m = {}; DATA.medications.forEach((x) => (m[x.id] = x)); return m;
     }, []);
     return html`<section>
       <div class="filters">
-        <select value=${type} onChange=${(e) => setType(e.target.value)}>
+        <select value=${type} onChange=${(e) => { setType(e.target.value); setFac(""); }}>
           <option value="">全部類型</option>
           ${Object.keys(TYPE_META).map((t) => html`<option value=${t}>${fmtType(t)}</option>`)}
         </select>
-        <select value=${fac} onChange=${(e) => setFac(e.target.value)}>
-          <option value="">全部院所</option>
+        <select value=${effFac} onChange=${(e) => setFac(e.target.value)}>
+          <option value="">全部院所（${facilities.length}）</option>
           ${facilities.map((f) => html`<option value=${f}>${f}</option>`)}
         </select>
         <span class="note">${list.length} 筆</span>
@@ -196,30 +231,58 @@
     </section>`;
   }
 
-  /* ---------- 用藥 ---------- */
-  function Meds() {
+  /* ---------- 用藥（分類＋可展開處方時間軸） ---------- */
+  const MED_CATS = [["drug", "藥品"], ["tcm", "中醫用藥"], ["order", "診療項目與其他"]];
+
+  function MedGroup({ g, open, onToggle }) {
+    const m = g.m;
+    const days = g.items.reduce((s, x) => s + (x.days_supply || 0), 0);
+    const facs = [...new Set(g.items.map((x) => x.facility_name))];
+    return html`<div class="event ${open ? "open" : ""}">
+      <div class="evhead rowlink" onClick=${onToggle}>
+        <b>${m.drug_zh || m.order_name}</b>
+        <span class="note">${g.items.length} 次${days ? `｜合計 ${days} 日份` : ""}｜最近 ${g.items[0].date}</span>
+        <span class="note" style="margin-left:auto">${open ? "▴" : "▾"}</span>
+      </div>
+      ${open && html`<div class="evbody">
+        ${m.ingredient && html`<p class="note">成分：${m.ingredient}
+          ${m.leaflet_url && html`｜<a href=${m.leaflet_url} target="_blank" rel="noopener">仿單↗</a>`}</p>`}
+        <${DispenseTimeline} items=${g.items} />
+        <table><tr><th>日期</th><th>院所</th><th>總量</th><th>天數</th></tr>
+          ${g.items.map((x) => html`<tr><td class="dt">${x.date}</td>
+            <td class="dt">${x.facility_name}</td>
+            <td class="num">${x.total_qty ?? ""}</td><td class="num">${x.days_supply ?? ""}</td></tr>`)}
+        </table>
+        <p class="note">院所：${facs.join("、")}</p>
+      </div>`}
+    </div>`;
+  }
+
+  function Meds({ focus }) {
     const groups = useMemo(() => {
       const g = {};
       DATA.medications.forEach((m) => {
-        const key = m.order_code || m.order_name;
-        (g[key] = g[key] || { items: [], m }).items.push(m);
+        const key = medKey(m);
+        (g[key] = g[key] || { key, items: [], m }).items.push(m);
       });
       return Object.values(g).sort((a, b) => b.items.length - a.items.length);
     }, []);
+    const focusGroup = focus && focus.med ? groups.find((g) => g.key === focus.med) : null;
+    const [openKey, setOpenKey] = useState(focusGroup ? focusGroup.key : null);
+    const [cat, setCat] = useState(focusGroup ? medCategory(focusGroup.m) : "drug");
+    const byCat = (c) => groups.filter((g) => medCategory(g.m) === c);
     return html`<section>
-      <p class="note">同代號分組；藥品資訊來自健保用藥品項檔
-        （版本 ${DATA.meta.drug_cache ? DATA.meta.drug_cache.updated_at : "未建快取"}），
-        非藥品之診療醫令顯示原始名稱。</p>
-      <table><tr><th>藥品/醫令</th><th>成分</th><th>次數</th><th>合計天數</th><th>最近</th><th>院所</th><th>仿單</th></tr>
-      ${groups.map((g) => { const m = g.m;
-        const days = g.items.reduce((s, x) => s + (x.days_supply || 0), 0);
-        const facs = [...new Set(g.items.map((x) => x.facility_name))];
-        return html`<tr><td>${m.drug_zh || m.order_name}</td>
-          <td class="dt">${m.ingredient || ""}</td>
-          <td class="num">${g.items.length}</td><td class="num">${days || ""}</td>
-          <td class="dt">${g.items[0].date}</td><td class="dt">${facs.join("、")}</td>
-          <td>${m.leaflet_url ? html`<a href=${m.leaflet_url} target="_blank" rel="noopener">仿單↗</a>` : ""}</td></tr>`; })}
-      </table></section>`;
+      <div class="filters">
+        ${MED_CATS.map(([c, label]) => html`<button
+          class="catbtn ${cat === c ? "on" : ""}"
+          onClick=${() => { setCat(c); setOpenKey(null); }}>${label}（${byCat(c).length}）</button>`)}
+      </div>
+      <p class="note">藥品資訊來自健保用藥品項檔（版本
+        ${DATA.meta.drug_cache ? DATA.meta.drug_cache.updated_at : "未建快取"}）；
+        點列展開處方時間軸。</p>
+      ${byCat(cat).map((g) => html`<${MedGroup} g=${g} open=${openKey === g.key}
+        onToggle=${() => setOpenKey(openKey === g.key ? null : g.key)} />`)}
+    </section>`;
   }
 
   /* ---------- 趨勢 ---------- */
@@ -228,20 +291,22 @@
     return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
   }
 
-  function Trends() {
+  function Trends({ focus }) {
     const labNames = useMemo(() => {
       const names = {};
       DATA.labs.forEach((l) => (names[l.name] = names[l.name] || []).push(l));
       return Object.entries(names).sort((a, b) => b[1].length - a[1].length);
     }, []);
-    const [sel, setSel] = useState(labNames.length ? labNames[0][0] : "");
+    const init = focus && focus.lab && labNames.some(([n]) => n === focus.lab)
+      ? focus.lab : (labNames.length ? labNames[0][0] : "");
+    const [sel, setSel] = useState(init);
     const rows = (labNames.find(([n]) => n === sel) || [null, []])[1];
     const numRows = rows.filter((l) => l.value_numeric != null);
     const ref = numRows.length ? parseRef(numRows[numRows.length - 1].ref_range) : null;
     const know = DATA.knowledge[sel];
     const weightSeries = [
       { label: "體重（自主量測）", color: "var(--s1)", points: DATA.measures["體重"] || [] },
-      { label: "成健", color: "var(--s2)", marker: 6, stroke: "var(--sur)",
+      { label: "成健", color: "var(--s2)", marker: 6, stroke: "var(--card)",
         points: DATA.nhi_body.filter((b) => b.weight_kg).map((b) => [b.check_date, b.weight_kg]) },
     ];
     const bpSeries = [
@@ -270,8 +335,8 @@
       <${LineChart} unit="kg" series=${weightSeries} />
       <h2>血壓（每日中位數）</h2>
       <${LineChart} unit="mmHg" series=${bpSeries} />
-      <h2>日均步數（每日單一來源最大值）</h2>
-      <${LineChart} unit="步" series=${[{ label: "步數", color: "var(--s1)",
+      <h2>日均步數（每日單一來源最大值，月平均）</h2>
+      <${LineChart} unit="步" series=${[{ label: "日均步數", color: "var(--s1)",
         points: monthlyAvg(DATA.activity["步數"] || []) }]} />
     </section>`;
   }
@@ -283,7 +348,7 @@
       [m, Math.round(vs.reduce((s, x) => s + x, 0) / vs.length)]);
   }
 
-  /* ---------- 搜尋 ---------- */
+  /* ---------- 搜尋（結果全面可點選跳轉） ---------- */
   function Search({ q, go }) {
     const needle = q.trim().toLowerCase();
     const res = useMemo(() => {
@@ -297,20 +362,32 @@
       };
     }, [needle]);
     if (!res) return html`<p class="note">輸入院所、診斷、藥名、檢驗名或報告文字。</p>`;
+    const medGroups = [...new Map(res.medications.map((m) => [medKey(m), m])).values()];
+    const labGroups = [...new Map(res.labs.map((l) => [l.name, l])).values()];
     return html`<section>
       <h2>就醫（${res.encounters.length}）</h2>
-      ${res.encounters.slice(0, 20).map((e) => html`<div class="rowlink" onClick=${() => go("timeline", e.id)}>
-        <span class="dt">${e.date}</span> <${Chip} type=${e.type} /> ${e.facility_name}：${e.dx_name || ""}</div>`)}
-      <h2>用藥（${res.medications.length}）</h2>
-      ${res.medications.slice(0, 20).map((m) => html`<div><span class="dt">${m.date}</span>
-        ${m.drug_zh || m.order_name} <span class="dt">${m.facility_name}</span></div>`)}
-      <h2>檢驗（${res.labs.length}）</h2>
-      ${res.labs.slice(0, 20).map((l) => html`<div><span class="dt">${l.test_date}</span>
-        ${l.name}＝${l.value_text} <span class="dt">${l.facility_name}</span></div>`)}
+      <div class="card">${res.encounters.slice(0, 20).map((e) => html`
+        <div class="rowlink srow" onClick=${() => go("timeline", { enc: e.id })}>
+          <span class="dt">${e.date}</span> <${Chip} type=${e.type} />
+          <span> ${e.facility_name}：${e.dx_name || ""}</span><span class="go">›</span></div>`)}
+        ${!res.encounters.length && html`<p class="note">無符合</p>`}</div>
+      <h2>用藥（${medGroups.length} 項）</h2>
+      <div class="card">${medGroups.slice(0, 20).map((m) => html`
+        <div class="rowlink srow" onClick=${() => go("meds", { med: medKey(m) })}>
+          <span>${m.drug_zh || m.order_name}</span>
+          <span class="dt">${m.ingredient || ""}</span><span class="go">›</span></div>`)}
+        ${!medGroups.length && html`<p class="note">無符合</p>`}</div>
+      <h2>檢驗（${labGroups.length} 項）</h2>
+      <div class="card">${labGroups.slice(0, 20).map((l) => html`
+        <div class="rowlink srow" onClick=${() => go("trends", { lab: l.name })}>
+          <span>${l.name}</span>
+          <span class="dt">最近 ${l.test_date}＝${l.value_text}</span><span class="go">›</span></div>`)}
+        ${!labGroups.length && html`<p class="note">無符合</p>`}</div>
       <h2>影像病理報告（${res.reports.length}）</h2>
-      ${res.reports.slice(0, 10).map((r) => html`<details><summary>
+      <div class="card">${res.reports.slice(0, 10).map((r) => html`<details><summary>
         <span class="dt">${r.test_date}</span> ${r.order_name}（${r.facility_name}）</summary>
         <pre class="report">${r.report_text}</pre></details>`)}
+        ${!res.reports.length && html`<p class="note">無符合</p>`}</div>
     </section>`;
   }
 
@@ -318,14 +395,14 @@
   const TABS = [["overview", "總覽"], ["timeline", "就醫時間軸"], ["meds", "用藥"], ["trends", "趨勢"]];
   function App() {
     const [tab, setTab] = useState("overview");
-    const [focusId, setFocusId] = useState(null);
+    const [focus, setFocus] = useState(null);
     const [q, setQ] = useState("");
-    const go = (t, id) => { setTab(t); setFocusId(id); setQ(""); };
+    const go = (t, payload) => { setTab(t); setFocus(payload || null); setQ(""); };
     const view = q.trim() ? html`<${Search} q=${q} go=${go} />`
       : tab === "overview" ? html`<${Overview} go=${go} />`
-      : tab === "timeline" ? html`<${Timeline} focusId=${focusId} />`
-      : tab === "meds" ? html`<${Meds} />`
-      : html`<${Trends} />`;
+      : tab === "timeline" ? html`<${Timeline} key=${"t" + JSON.stringify(focus)} focus=${focus} />`
+      : tab === "meds" ? html`<${Meds} key=${"m" + JSON.stringify(focus)} focus=${focus} />`
+      : html`<${Trends} key=${"r" + JSON.stringify(focus)} focus=${focus} />`;
     return html`<div>
       <header>
         <h1>個人健康資料工作台</h1>
@@ -346,6 +423,6 @@
   }
 
   const root = document.getElementById("app");
-  root.textContent = "";  // 移除 no-JS fallback
+  root.textContent = "";
   render(html`<${App} />`, root);
 })();

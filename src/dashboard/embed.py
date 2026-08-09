@@ -58,7 +58,8 @@ def build_payload(store, db_path):
     medications = []
     for r in con.execute("""
         SELECT m.id, m.encounter_id, m.order_code, m.order_name, m.total_qty,
-               m.days_supply, m.tooth_name, e.date, e.facility_name
+               m.days_supply, m.tooth_name, m.section AS section_hint,
+               e.date, e.facility_name
         FROM medications m JOIN encounters e ON m.encounter_id = e.id
         ORDER BY e.date DESC"""):
         m = dict(r)
@@ -100,9 +101,12 @@ def build_payload(store, db_path):
         SELECT activity, substr(start_ts,1,10) AS date, duration_min, source_name
         FROM apple_workouts ORDER BY start_ts DESC""")]
 
+    date_min, date_max = con.execute(
+        "SELECT MIN(date), MAX(date) FROM encounters").fetchone()
     payload = {
         "meta": {
             "generated_at": date.today().isoformat(),
+            "date_min": date_min, "date_max": date_max,
             "profile": con.execute("SELECT display_name FROM profiles LIMIT 1").fetchone()[0],
             "counts": store.table_counts(),
             "sources": [dict(r) for r in con.execute(
