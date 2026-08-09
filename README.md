@@ -17,12 +17,14 @@
      apple_health_export（zip 或解壓後資料夾）傳到電腦
 
 2. 匯入（自動判型、可重複執行、冪等累加）
-   python3 -m src.mhb_cli import ~/Downloads/健康存摺醫療類_YYYMMDD.JSON
-   python3 -m src.mhb_cli import ~/Downloads/apple_health_export
+   bin/mhb import ~/Downloads/健康存摺醫療類_YYYMMDD.JSON
+   bin/mhb import ~/Downloads/apple_health_export
+   （bin/mhb 任何目錄皆可執行；等價於在 repo 內跑 python3 -m src.mhb_cli）
 
 3. 開啟 dashboard（匯入後自動產出；也可手動重建）
-   python3 -m src.mhb_cli rebuild
+   bin/mhb rebuild
    open data/dashboard_YYYYMMDD-private.html
+   （舊的 dashboard_*.html 都是完整快照，確認新檔正常後可自行刪除）
 ```
 
 每隔一段時間（例如每月）重複以上流程：健保三年滾動視窗會被自動
@@ -31,10 +33,12 @@
 ### 其他命令
 
 ```
-python3 -m src.mhb_cli status              # schema 版本與各表筆數
-python3 -m src.mhb_cli quality             # 全庫品質報告（唯讀）
-python3 -m src.mhb_cli knowledge update    # 更新健保藥品品項快取（手動觸發）
+bin/mhb status              # schema 版本與各表筆數
+bin/mhb quality             # 全庫品質報告（唯讀）
+bin/mhb knowledge update    # 更新健保藥品品項快取（手動觸發，建議每季）
 ```
+
+想全域使用可建立捷徑：`ln -s "$(pwd)/bin/mhb" /usr/local/bin/mhb`
 
 ## 隱私與資料位置
 

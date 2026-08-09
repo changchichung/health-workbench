@@ -12,3 +12,4 @@ phase0/output/
 __pycache__/
 *.pyc
 .claude/worktrees/
+openspec/.vector-search.db*
