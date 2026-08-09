@@ -30,7 +30,7 @@ function isNoData(rows, sec) {
     && rows[0][keys[0]] === NO_DATA);
 }
 
-const stripBom = (s) => s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+export const stripBom = (s) => s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
 
 export const nhiJsonAdapter = {
   id: "nhi_json",
@@ -46,18 +46,28 @@ export const nhiJsonAdapter = {
   },
 
   // source: { bytes: Uint8Array, name: string }
-  // opts: { labEntries, assumeProfile?, confirmNewProfile?: async (maskedId)=>bool }
-  // 回傳 { status: "ok"|"aborted"|"skipped_duplicate", messages, report? }
   async importSource(source, driver, progress, opts = {}) {
-    const messages = [];
-    const sha256 = await sha256Hex(source.bytes);
     const data = JSON.parse(stripBom(new TextDecoder("utf-8").decode(source.bytes)));
     const bdata = Object.fromEntries(
       Object.entries(data.myhealthbank.bdata).map(([k, v]) => [k.toLowerCase(), v]));
-    const maskedId = (bdata["b1.1"] || "").trim();
-    const store = new EngineStore(driver);
+    return importNhiBdata(bdata, {
+      name: source.name, sha256: await sha256Hex(source.bytes),
+      adapter: "nhi_json",
+    }, driver, progress, opts);
+  },
+};
 
-    return driver.transaction(async () => {
+// JSON/XML 共用的匯入核心：bdata 形狀＝JSON 版 myhealthbank.bdata。
+// meta: { name, sha256, adapter, formatVariant? }
+// opts: { labEntries, assumeProfile?, confirmNewProfile?: async (maskedId)=>bool }
+// 回傳 { status: "ok"|"aborted"|"skipped_duplicate", messages, report? }
+export async function importNhiBdata(bdata, meta, driver, progress, opts = {}) {
+  const messages = [];
+  const sha256 = meta.sha256;
+  const maskedId = (bdata["b1.1"] || "").trim();
+  const store = new EngineStore(driver);
+
+  return driver.transaction(async () => {
       // 遮罩身分證歸戶防護（語意同 Python：綁定一致／缺 b1.1 中止／首匯認領）
       const existing = await store.getFirstProfile();
       let pid;
@@ -93,7 +103,7 @@ export const nhiJsonAdapter = {
       }
 
       const { docId, importedAt } = await store.registerSource(
-        pid, source.name, sha256, "nhi_json", ADAPTER_VERSION);
+        pid, meta.name, sha256, meta.adapter, ADAPTER_VERSION);
       if (importedAt) {
         messages.push(`此檔案已於 ${importedAt} 匯入過（SHA-256 相同），跳過。`);
         return { status: "skipped_duplicate", importedAt, messages };
@@ -329,6 +339,15 @@ export const nhiJsonAdapter = {
         }
       }
 
+      // XML 官方格式無 r9-r14（格式事實，非資料異常）
+      if (meta.formatVariant === "xml") {
+        for (const sec of ["r9", "r10", "r11", "r12", "r13", "r14"]) {
+          if (!(sec in bdata)) {
+            sections[sec] = { status: "no_data", records: 0, note: "XML 格式無此節區" };
+          }
+        }
+      }
+
       // 檢驗名稱正規化（D5）：冪等重算全部 lab_results
       await applyNormalization(store, opts.labEntries ?? []);
 
@@ -339,18 +358,17 @@ export const nhiJsonAdapter = {
       await store.finalizeImport(docId);
       const report = await buildIncremental(store, {
         sections,
-        sourceInfo: { filename: source.name, sha256,
-          adapter: "nhi_json", adapter_version: ADAPTER_VERSION,
+        sourceInfo: { filename: meta.name, sha256,
+          adapter: meta.adapter, adapter_version: ADAPTER_VERSION,
           unknown_fields: unknownFields, parse_errors: parseErrors,
           medication_reconciliation: reconciliation },
       });
       return { status: "ok", messages, report };
-    }).catch((e) => {
-      if (e instanceof AbortImport) return { status: "aborted", messages: e.messages };
-      throw e;
-    });
-  },
-};
+  }).catch((e) => {
+    if (e instanceof AbortImport) return { status: "aborted", messages: e.messages };
+    throw e;
+  });
+}
 
 class AbortImport extends Error {
   constructor(messages) {
