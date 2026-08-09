@@ -1,5 +1,8 @@
-// dev spike（task 0.2/0.3）：偵測 /tmp/mhb_spike_request.json 即自動執行，
-// 結果寫 /tmp/mhb_spike_result.json。正式匯入 GUI（task 4.x）落地後移除本檔。
+// dev spike（task 0.2/0.3/1.3/1.4）：偵測 /tmp/mhb_spike_request.json 即自動
+// 執行，結果寫 /tmp/mhb_spike_result.json。正式匯入 GUI（task 4.x）落地後移除本檔。
+import { TauriDriver } from "../store/tauri_driver.js";
+import { runSmoke } from "../store/smoke.js";
+
 const REQ = "/tmp/mhb_spike_request.json";
 const RES = "/tmp/mhb_spike_result.json";
 
@@ -132,7 +135,7 @@ async function batchSpike(sql, dbPath, opts = {}) {
   return { seconds: +seconds.toFixed(2), count: rows[0].c, mode, batchRows };
 }
 
-export async function maybeRunSpike(statusEl) {
+export async function maybeRunSpike(statusEl, ctx = {}) {
   const t = window.__TAURI__;
   if (!t?.fs) return;
   let req;
@@ -145,6 +148,15 @@ export async function maybeRunSpike(statusEl) {
   statusEl.textContent = "spike 執行中…";
   const result = { started_at: new Date().toISOString() };
   try {
+    if (req.boot_report) result.boot = ctx.bootInfo ?? null;
+    if (req.driver_smoke_db) {
+      const d = await TauriDriver.open(req.driver_smoke_db);
+      result.smoke = await runSmoke(d);
+      await d.close();
+    }
+    if (req.import_db && ctx.importExisting) {
+      result.import = await ctx.importExisting(req.import_db);
+    }
     if (req.parse_file) result.parse = await parseSpike(t.fs, req.parse_file);
     if (req.batch_db) {
       if (req.batch_hold) {
