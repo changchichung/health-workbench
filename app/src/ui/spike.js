@@ -142,6 +142,16 @@ export async function maybeRunSpike(statusEl, ctx = {}) {
         status_line: statusEl.textContent,
       };
     }
+    if (req.viewer_check && ctx.app?.viewer) {
+      const r = await ctx.app.viewer.refresh();
+      const frame = document.getElementById("viewer-frame");
+      let inner = "";
+      try { inner = frame?.contentDocument?.body?.textContent?.slice(0, 400) || ""; } catch {}
+      result.viewer = { ...r, iframe_hidden: frame?.hidden ?? null, inner_head: inner };
+    }
+    if (req.export_html && ctx.app?.viewer) {
+      result.export = await ctx.app.viewer.exportHtml(req.export_html.path);
+    }
     if (req.driver_smoke_db) {
       const d = await TauriDriver.open(req.driver_smoke_db);
       result.smoke = await runSmoke(d);

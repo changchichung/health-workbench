@@ -5,9 +5,10 @@ import { TauriDriver } from "../store/tauri_driver.js";
 import { initSchema, SCHEMA_VERSION } from "../store/schema.js";
 import { resolveDbPath, importExistingDb } from "../store/location.js";
 import { createImportFlow } from "./import_flow.js";
+import { createViewer } from "./viewer.js";
 
 const statusEl = document.getElementById("status");
-const app = { driver: null, dbPath: null, flow: null };
+const app = { driver: null, dbPath: null, flow: null, viewer: null };
 
 async function tableCounts(driver) {
   const tables = ["encounters", "medications", "lab_results", "apple_records"];
@@ -70,11 +71,22 @@ function dialogOpen(opts) {
 }
 
 async function wireUi() {
+  const labEntries = await loadLabEntries();
+  app.viewer = createViewer({
+    getDriver: () => app.driver,
+    getDbPath: () => app.dbPath,
+    labEntries,
+  });
   app.flow = createImportFlow({
     getDriver: () => app.driver,
-    labEntries: await loadLabEntries(),
-    onImported: () => refreshStatus(),
+    labEntries,
+    onImported: async () => { await refreshStatus(); await app.viewer.refresh(); },
   });
+  document.getElementById("export-html-btn").addEventListener("click", async () => {
+    const r = await app.viewer.exportHtml();
+    if (r.ok) statusEl.textContent = `已匯出：${r.path}（${(r.bytes / 1024).toFixed(0)}KB，含全部個資請妥善保管）`;
+  });
+  await app.viewer.refresh();
 
   document.getElementById("pick-file-btn").addEventListener("click", async () => {
     const p = await dialogOpen({ multiple: false, title: "選擇健保存摺或 Apple 健康匯出檔" });

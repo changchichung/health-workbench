@@ -1,0 +1,22 @@
+{
+  "$comment": "DataProvider 契約（design D4）：payload 頂層形狀，與 embed.py build_payload 同構。前端與 HTML 匯出共用。",
+  "type": "object",
+  "required": ["meta", "encounters", "meds_by_enc", "medications", "labs",
+    "reports", "immunizations", "nhi_body", "knowledge", "activity",
+    "measures", "workouts"],
+  "properties": {
+    "meta": { "type": "object",
+      "required": ["generated_at", "date_min", "date_max", "profile", "counts", "sources", "drug_cache"] },
+    "encounters": { "type": "array" },
+    "meds_by_enc": { "type": "object" },
+    "medications": { "type": "array" },
+    "labs": { "type": "array" },
+    "reports": { "type": "array" },
+    "immunizations": { "type": "array" },
+    "nhi_body": { "type": "array" },
+    "knowledge": { "type": "object" },
+    "activity": { "type": "object" },
+    "measures": { "type": "object" },
+    "workouts": { "type": "array" }
+  }
+}
