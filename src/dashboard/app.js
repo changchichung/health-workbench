@@ -4,7 +4,7 @@
   "use strict";
   const DATA = JSON.parse(document.getElementById("mhb-data").textContent);
   const { h, render } = preact;
-  const { useState, useMemo } = preactHooks;
+  const { useState, useMemo, useEffect } = preactHooks;
   const html = htm.bind(h);
 
   const TYPE_META = {
@@ -197,6 +197,12 @@
     const medById = useMemo(() => {
       const m = {}; DATA.medications.forEach((x) => (m[x.id] = x)); return m;
     }, []);
+    useEffect(() => {
+      if (focus && focus.enc) {
+        const el = document.querySelector(".event.open");
+        if (el) el.scrollIntoView({ block: "start" });
+      }
+    }, []);
     return html`<section>
       <div class="filters">
         <select value=${type} onChange=${(e) => { setType(e.target.value); setFac(""); }}>
@@ -274,6 +280,12 @@
     const [openKey, setOpenKey] = useState(focusGroup ? focusGroup.key : null);
     const [cat, setCat] = useState(focusGroup ? medCategory(focusGroup.m) : "drug");
     const byCat = (c) => groups.filter((g) => medCategory(g.m) === c);
+    useEffect(() => {
+      if (focusGroup) {
+        const el = document.querySelector(".event.open");
+        if (el) el.scrollIntoView({ block: "start" });
+      }
+    }, []);
     return html`<section>
       <div class="filters">
         ${MED_CATS.map(([c, label]) => html`<button
