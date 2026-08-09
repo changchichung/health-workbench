@@ -10,7 +10,22 @@
   <main id="app">
     <h1>健康資料工作台</h1>
     <p id="status">App 殼啟動中…</p>
-    <button id="import-db-btn" type="button">匯入既有資料庫檔</button>
+    <div class="toolbar">
+      <button id="pick-file-btn" type="button">選擇檔案匯入…</button>
+      <button id="pick-dir-btn" type="button">選擇 Apple 匯出資料夾…</button>
+      <button id="import-db-btn" type="button">匯入既有資料庫檔…</button>
+    </div>
+    <p class="hint">也可以直接把健保存摺 JSON/XML、Apple 健康匯出（zip 或資料夾）拖進視窗。</p>
+
+    <section id="import-panel" hidden>
+      <p id="import-msg" hidden></p>
+      <div id="import-confirm" hidden></div>
+      <div id="import-progress" hidden>
+        <progress id="import-bar" max="100" value="0"></progress>
+        <p id="import-progress-text"></p>
+      </div>
+      <div id="import-report" hidden></div>
+    </section>
   </main>
   <script type="module" src="./ui/main.js"></script>
 </body>

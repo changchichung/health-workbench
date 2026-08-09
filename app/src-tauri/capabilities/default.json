@@ -1,14 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "主視窗權限：SQL、選檔對話框、檔案存取（dev 階段先寬鬆，出貨前依 gate-proof 收斂 scope）",
+  "description": "主視窗權限：選檔對話框、檔案存取（dev 階段先寬鬆，出貨前依 gate-proof 收斂 scope）；SQLite 走 app 自有 db_* commands 不經插件",
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "sql:default",
-    "sql:allow-execute",
-    "sql:allow-select",
-    "sql:allow-load",
     "dialog:default",
     "fs:default",
     {
@@ -53,6 +49,14 @@
     },
     {
       "identifier": "fs:allow-exists",
+      "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-seek",
+      "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
       "allow": [{ "path": "**" }]
     }
   ]

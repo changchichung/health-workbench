@@ -1,33 +1,27 @@
-// StoreDriver 的 tauri-plugin-sql 實作（App 端）。介面與 node_driver 同形。
-// 注意：交易依賴 plugin 連線序列化（task 0.3 kill 演練已驗證原子性）；
-// 上層以「同一時間僅一個匯入」防重入（app-import-gui spec）。
+// StoreDriver 的 App 端實作：走 shell 層 SQLite 橋（db_* commands，
+// 每個 DB 路徑一條 rusqlite 連線＋Mutex 序列化）。介面與 node_driver 同形。
+// design D2 修訂二：原 tauri-plugin-sql（sqlx 10 連線池）跨呼叫交易語意
+// 不安全（孤兒交易幽靈讀，2026-08-09 實測），棄用改本橋。
 const BATCH_SIZE = 20000;
 
-function resolveLoad() {
-  const sql = window.__TAURI__?.sql;
-  const load = sql?.Database?.load?.bind(sql.Database)
-    || sql?.default?.load?.bind(sql.default)
-    || sql?.load;
-  if (!load) throw new Error("tauri-plugin-sql 不可用（withGlobalTauri 未注入）");
-  return load;
-}
+const invoke = (...args) => window.__TAURI__.core.invoke(...args);
 
 export class TauriDriver {
   static async open(dbPath) {
     const d = new TauriDriver();
-    d.db = await resolveLoad()(`sqlite:${dbPath}`);
     d.path = dbPath;
     await d.execute("PRAGMA foreign_keys = ON");
     return d;
   }
 
   async execute(sql, params = []) {
-    const r = await this.db.execute(sql, params);
-    return { changes: r.rowsAffected ?? 0, lastInsertRowid: r.lastInsertId ?? 0 };
+    const [changes, lastInsertRowid] = await invoke("db_execute",
+      { path: this.path, sql, params: params.map(nullify) });
+    return { changes, lastInsertRowid };
   }
 
   async select(sql, params = []) {
-    return this.db.select(sql, params);
+    return invoke("db_select", { path: this.path, sql, params: params.map(nullify) });
   }
 
   // 批次寫入＝json_each 單參數展開（design D2 修訂；兩 driver 同 SQL 形狀）
@@ -35,11 +29,11 @@ export class TauriDriver {
     if (rows.length === 0) return 0;
     const verb = ignore ? "INSERT OR IGNORE" : "INSERT";
     const sel = columns.map((_, c) => `json_extract(value,'$[${c}]')`).join(", ");
-    const sql = `${verb} INTO ${table} (${columns.join(", ")}) SELECT ${sel} FROM json_each($1)`;
+    const sql = `${verb} INTO ${table} (${columns.join(", ")}) SELECT ${sel} FROM json_each(?)`;
     let inserted = 0;
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const r = await this.db.execute(sql, [JSON.stringify(rows.slice(i, i + BATCH_SIZE))]);
-      inserted += r.rowsAffected ?? 0;
+      const r = await this.execute(sql, [JSON.stringify(rows.slice(i, i + BATCH_SIZE))]);
+      inserted += r.changes;
     }
     return inserted;
   }
@@ -57,6 +51,8 @@ export class TauriDriver {
   }
 
   async close() {
-    await this.db.close();
+    await invoke("db_close", { path: this.path });
   }
 }
+
+const nullify = (v) => v === undefined ? null : v;

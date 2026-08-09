@@ -77,17 +77,10 @@ async function parseSpike(fs, filePath) {
            mb_per_s: +(readBytes / 1048576 / seconds).toFixed(1), records, workouts };
 }
 
-// task 0.3：tauri-plugin-sql 單交易批寫 10 萬筆（實驗矩陣：values vs json_each）
-async function batchSpike(sql, dbPath, opts = {}) {
+// task 0.3 復驗（D2 修訂二後）：SQLite 橋單交易批寫 10 萬筆（json_each）
+async function batchSpike(_sql, dbPath, opts = {}) {
   const { holdOpen = false } = opts;
-  // withGlobalTauri 下各 plugin 的匯出形狀不一，做相容解析並留診斷
-  const load = sql?.Database?.load?.bind(sql.Database)
-    || sql?.default?.load?.bind(sql.default)
-    || sql?.load;
-  if (!load) {
-    throw new Error(`sql plugin 全域形狀不明：__TAURI__ keys=${Object.keys(window.__TAURI__ || {})}；sql keys=${Object.keys(sql || {})}`);
-  }
-  const db = await load(`sqlite:${dbPath}`);
+  const db = await TauriDriver.open(dbPath);
   await db.execute(`CREATE TABLE IF NOT EXISTS apple_records(
     id INTEGER PRIMARY KEY, profile_id INTEGER NOT NULL, doc_id INTEGER NOT NULL,
     type TEXT NOT NULL, type_zh TEXT NOT NULL, start_ts TEXT NOT NULL, end_ts TEXT NOT NULL,
@@ -95,45 +88,23 @@ async function batchSpike(sql, dbPath, opts = {}) {
     source_name TEXT, quality_flags TEXT NOT NULL DEFAULT '')`);
   await db.execute("DELETE FROM apple_records");
   const t0 = performance.now();
-  const COLS = 13, TOTAL = 100000;
-  const mode = opts.mode || "values";
-  const batchRows = opts.batchRows || 500;
-  const mkRow = (k) => [null, 1, 1, "HKQuantityTypeIdentifierStepCount", "步數",
+  const TOTAL = 100000;
+  const COLS = ["id", "profile_id", "doc_id", "type", "type_zh", "start_ts", "end_ts",
+    "value_numeric", "value_normalized", "value_text", "unit", "source_name", "quality_flags"];
+  const rows = Array.from({ length: TOTAL }, (_, k) => [null, 1, 1,
+    "HKQuantityTypeIdentifierStepCount", "步數",
     `2026-01-01 00:00:${String(k % 60).padStart(2, "0")}`, "2026-01-01 00:01:00",
-    k, null, null, "count", `src${k}`, ""];
-  const COLUMNS = "id,profile_id,doc_id,type,type_zh,start_ts,end_ts,"
-    + "value_numeric,value_normalized,value_text,unit,source_name,quality_flags";
+    k, null, null, "count", `src${k}`, ""]);
   await db.execute("BEGIN");
-  for (let i = 0; i < TOTAL; i += batchRows) {
-    const n = Math.min(batchRows, TOTAL - i);
-    if (mode === "json_each") {
-      // 單一 JSON 字串參數，SQLite 端 json_each 展開，IPC 呼叫數＝TOTAL/batchRows
-      const payload = JSON.stringify(
-        Array.from({ length: n }, (_, j) => mkRow(i + j)));
-      await db.execute(
-        `INSERT INTO apple_records(${COLUMNS}) SELECT ` +
-        Array.from({ length: COLS }, (_, c) => `json_extract(value,'$[${c}]')`).join(",") +
-        ` FROM json_each($1)`, [payload]);
-    } else {
-      const rows = [];
-      const params = [];
-      for (let j = 0; j < n; j++) {
-        const base = j * COLS; // $N 佔位是每個 statement 重新編號，用批內列號
-        rows.push(`(${Array.from({ length: COLS }, (_, c) => `$${base + c + 1}`).join(",")})`);
-        params.push(...mkRow(i + j));
-      }
-      await db.execute(
-        `INSERT INTO apple_records(${COLUMNS}) VALUES ${rows.join(",")}`, params);
-    }
-  }
+  await db.batchInsert("apple_records", COLS, rows);
   if (holdOpen) {
     // kill 演練：不 COMMIT，留交易開著等外部 kill
     return { held: true };
   }
   await db.execute("COMMIT");
   const seconds = (performance.now() - t0) / 1000;
-  const rows = await db.select("SELECT count(*) c FROM apple_records");
-  return { seconds: +seconds.toFixed(2), count: rows[0].c, mode, batchRows };
+  const out = await db.select("SELECT count(*) c FROM apple_records");
+  return { seconds: +seconds.toFixed(2), count: out[0].c };
 }
 
 export async function maybeRunSpike(statusEl, ctx = {}) {
@@ -150,6 +121,27 @@ export async function maybeRunSpike(statusEl, ctx = {}) {
   const result = { started_at: new Date().toISOString() };
   try {
     if (req.boot_report) result.boot = ctx.bootInfo ?? null;
+    // 無頭驅動匯入 GUI（task 4.x G3）：與拖放同一條 offerFile→runImport 路徑
+    if (req.gui_import && ctx.flow) {
+      if (req.gui_import.assumeProfile) window.__MHB_TEST_ASSUME_PROFILE__ = true;
+      const offer = await ctx.flow.offerFile(req.gui_import.path);
+      let run = null;
+      if (offer.state === "confirming" && req.gui_import.autoConfirm !== false) {
+        run = await ctx.flow.runImport();
+      }
+      const reportEl = document.getElementById("import-report");
+      const msgEl = document.getElementById("import-msg");
+      result.gui = {
+        offer,
+        progress_events: window.__MHB_PROGRESS_EVENTS__ || 0,
+        status: run?.result?.status ?? null,
+        sections: run?.result?.report?.sections ?? null,
+        parse_errors: run?.result?.report?.source?.parse_errors?.length ?? null,
+        report_text: (reportEl?.textContent || "").slice(0, 600),
+        msg_text: msgEl?.textContent || "",
+        status_line: statusEl.textContent,
+      };
+    }
     if (req.driver_smoke_db) {
       const d = await TauriDriver.open(req.driver_smoke_db);
       result.smoke = await runSmoke(d);
