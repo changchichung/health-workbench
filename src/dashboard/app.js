@@ -17,9 +17,37 @@
   const typeColor = (t) => (TYPE_META[t] || [t, "var(--ink2)"])[1];
 
   /* ---------- 共用元件 ---------- */
-  function Tile({ value, label, unit }) {
-    return html`<div class="tile"><div class="tv">${value}<small> ${unit || ""}</small></div>
-      <div class="tl">${label}</div></div>`;
+  function latestAndDelta(series, daysBack) {
+    // series: [[date, val]...] 日序列；回傳 [最新值, 與 daysBack 天前的差]
+    if (!series || !series.length) return [null, null];
+    const last = series[series.length - 1];
+    const target = new Date(new Date(last[0]) - daysBack * 864e5)
+      .toISOString().slice(0, 10);
+    let ref = null;
+    for (const p of series) if (p[0] <= target) ref = p;
+    return [last[1], ref ? +(last[1] - ref[1]).toFixed(1) : null];
+  }
+
+  function avgWindow(series, days, endOffset) {
+    if (!series || !series.length) return null;
+    const end = new Date(new Date(series[series.length - 1][0]) - (endOffset || 0) * 864e5);
+    const start = new Date(end - days * 864e5);
+    const vals = series.filter((p) => new Date(p[0]) > start && new Date(p[0]) <= end)
+      .map((p) => p[1]);
+    return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+  }
+
+  function Delta({ d, unit, invert }) {
+    if (d == null || d === 0) return html`<div class="delta flat">— 持平</div>`;
+    const worse = invert ? d < 0 : d > 0;
+    return html`<div class="delta ${worse ? "up" : "down"}">
+      ${d > 0 ? "▲" : "▼"} ${Math.abs(d)}${unit || ""}</div>`;
+  }
+
+  function Card({ icon, color, title, wide, children }) {
+    return html`<div class="card ${wide ? "wide" : ""}">
+      <div class="cat"><span class="cdot" style="background:${color}">${icon}</span>${title}</div>
+      ${children}</div>`;
   }
 
   function Chip({ type }) {
@@ -64,28 +92,61 @@
       })}</svg></div>`;
   }
 
-  /* ---------- 總覽 ---------- */
+  /* ---------- 總覽（洞察式摘要卡） ---------- */
   function Overview({ go }) {
     const c = DATA.meta.counts;
-    const encs = DATA.encounters.slice(0, 10);
+    const encs = DATA.encounters.slice(0, 8);
+    const [w, wd] = latestAndDelta(DATA.measures["體重"], 7);
+    const [sys] = latestAndDelta(DATA.measures["收縮壓"], 7);
+    const [dia] = latestAndDelta(DATA.measures["舒張壓"], 7);
+    const steps30 = avgWindow(DATA.activity["步數"], 30, 0);
+    const stepsPrev = avgWindow(DATA.activity["步數"], 30, 30);
+    const latest = DATA.encounters[0];
+    const weightYear = (DATA.measures["體重"] || []).slice(-365);
+    const recentLabs = DATA.labs.filter((l) => l.value_numeric != null).slice(-4).reverse();
     return html`<section>
-      <div class="tiles">
-        <${Tile} value=${c.encounters} label="就醫事件" />
-        <${Tile} value=${c.medications} label="用藥明細" />
-        <${Tile} value=${c.lab_results} label="檢驗結果" />
-        <${Tile} value=${c.reports} label="影像病理報告" />
-        <${Tile} value=${c.immunizations} label="疫苗接種" />
-        <${Tile} value=${c.apple_records.toLocaleString()} label="Apple 量測" />
+      <div class="cards">
+        <${Card} icon="⚖︎" color="var(--s1)" title="體重">
+          ${w != null ? html`<div class="big">${w}<small> kg</small></div>
+            <${Delta} d=${wd} unit=" kg（7日）" invert=${false} />`
+            : html`<p class="note">尚無量測資料</p>`}
+        </${Card}>
+        <${Card} icon="♥" color="var(--s2)" title="血壓（最近量測日）">
+          ${sys != null ? html`<div class="big">${sys}<small>/${dia}</small></div>
+            <div class="delta flat">mmHg</div>` : html`<p class="note">尚無量測資料</p>`}
+        </${Card}>
+        <${Card} icon="🏃" color="var(--s4)" title="日均步數（30日）">
+          ${steps30 != null ? html`<div class="big">${steps30.toLocaleString()}</div>
+            <${Delta} d=${stepsPrev != null ? steps30 - stepsPrev : null} unit=" 較前期" invert=${true} />`
+            : html`<p class="note">尚無資料</p>`}
+        </${Card}>
+        <${Card} icon="📅" color="var(--accent)" title="最近就診">
+          ${latest ? html`<div class="big" style="font-size:20px">
+              ${latest.date?.slice(5).replace("-", "/")} ${fmtType(latest.type)}</div>
+            <div class="delta flat">${latest.facility_name}｜${latest.dx_name || ""}</div>`
+            : html`<p class="note">尚無資料</p>`}
+        </${Card}>
+        <${Card} wide icon="⚖︎" color="var(--s1)" title="體重趨勢（一年）">
+          <${LineChart} unit="kg" series=${[{ label: "體重", color: "var(--s1)",
+            points: weightYear }]} />
+        </${Card}>
+        <${Card} wide icon="🧪" color="var(--s3)" title="最新檢驗（點入趨勢頁看全部）">
+          <table>${recentLabs.map((l) => html`<tr class="rowlink" onClick=${() => go("trends")}>
+            <td>${l.name}</td><td class="num">${l.value_text}</td>
+            <td class="dt">${l.ref_range || ""}</td><td class="dt">${l.test_date}</td></tr>`)}
+          </table>
+        </${Card}>
+        <${Card} wide icon="📅" color="var(--accent)" title="最近就醫">
+          <table>${encs.map((e) => html`<tr class="rowlink" onClick=${() => go("timeline", e.id)}>
+            <td class="dt">${e.date}</td><td><${Chip} type=${e.type} /></td>
+            <td>${e.facility_name}</td><td class="dt">${e.dx_name || ""}</td></tr>`)}</table>
+        </${Card}>
+        <${Card} wide icon="🗂" color="var(--ink2)" title="資料庫">
+          <p class="note">就醫 ${c.encounters}｜用藥 ${c.medications}｜檢驗 ${c.lab_results}｜
+            報告 ${c.reports}｜疫苗 ${c.immunizations}｜Apple 量測 ${c.apple_records.toLocaleString()}。
+            來源：${DATA.meta.sources.map((s) => s.filename).join("、")}。</p>
+        </${Card}>
       </div>
-      <h2>資料來源</h2>
-      <table><tr><th>檔案</th><th>adapter</th><th>匯入時間</th></tr>
-        ${DATA.meta.sources.map((s) => html`<tr><td>${s.filename}</td>
-          <td>${s.adapter}</td><td class="dt">${s.imported_at}</td></tr>`)}</table>
-      <h2>最近就醫</h2>
-      <table><tr><th>日期</th><th>類型</th><th>院所</th><th>主診斷</th></tr>
-        ${encs.map((e) => html`<tr class="rowlink" onClick=${() => go("timeline", e.id)}>
-          <td class="dt">${e.date}</td><td><${Chip} type=${e.type} /></td>
-          <td>${e.facility_name}</td><td>${e.dx_name || ""}</td></tr>`)}</table>
     </section>`;
   }
 
@@ -268,7 +329,7 @@
     return html`<div>
       <header>
         <h1>個人健康資料工作台</h1>
-        <p class="note">本頁僅協助整理、搜尋與視覺化您自行提供的健康資料，不提供診斷、
+        <p class="disclaimer">本頁僅協助整理、搜尋與視覺化您自行提供的健康資料，不提供診斷、
           治療、用藥或其他醫療判斷建議；資料可能不完整或有格式誤差，如有醫療問題請諮詢
           合格醫事人員。<b>本檔含個人醫療資料，請勿外傳。</b>
           資料截至 ${DATA.meta.generated_at}。</p>
