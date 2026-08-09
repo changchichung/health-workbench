@@ -13,3 +13,10 @@ __pycache__/
 *.pyc
 .claude/worktrees/
 openspec/.vector-search.db*
+
+# Tauri app
+app/node_modules/
+app/src-tauri/target/
+app/src-tauri/gen/
+app/src-tauri/icons/android/
+app/src-tauri/icons/ios/

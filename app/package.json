@@ -1,0 +1,13 @@
+{
+  "name": "myhealthbank-app",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "test": "node --test tests/"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
