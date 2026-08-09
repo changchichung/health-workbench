@@ -165,6 +165,7 @@ class AppleHealthAdapter:
                 print(f"此檔案已於 {imported_at} 匯入過（SHA-256 相同），跳過。")
                 return 0
             stats = self._parse(store, opener, pid, doc_id)
+            store.finalize_import(doc_id)
             store.commit()
             report = build_incremental(
                 store, sections={"apple_records": {"status": "parsed", **stats}},

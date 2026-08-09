@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 from .fingerprint import canonical_json, record_fp
-from .schema import DDL, FP_TABLES, SCHEMA_VERSION
+from .schema import DDL, FP_TABLES, MIGRATIONS, SCHEMA_VERSION
 
 
 class SourceRequired(ValueError):
@@ -32,10 +32,21 @@ class Store:
             self.con.commit()
             return
         ver = cur.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
+        while ver < SCHEMA_VERSION:
+            steps = MIGRATIONS.get(ver)
+            if steps is None:
+                raise RuntimeError(
+                    f"資料庫 schema 版本 {ver} 與程式 {SCHEMA_VERSION} 不符，"
+                    f"且無可用遷移路徑；請備份後以 mhb import 重建。")
+            for sql in steps:
+                cur.execute(sql)
+            ver += 1
+            cur.execute("INSERT INTO schema_version(version) VALUES (?)", (ver,))
+            self.con.commit()
         if ver != SCHEMA_VERSION:
             raise RuntimeError(
-                f"資料庫 schema 版本 {ver} 與程式 {SCHEMA_VERSION} 不符，"
-                f"且無可用遷移路徑；請備份後以 mhb import 重建。")
+                f"資料庫 schema 版本 {ver} 高於程式支援的 {SCHEMA_VERSION}，"
+                f"請更新程式後再開啟。")
 
     # ---- profile ----
     def get_or_create_profile(self, display_name, masked_id=None):
@@ -61,6 +72,12 @@ class Store:
             " VALUES(?,?,?,?,?)",
             (profile_id, filename, sha256, adapter, adapter_version))
         return cur.lastrowid, None
+
+    def finalize_import(self, doc_id):
+        """把本次匯入統計寫回 source_documents.import_stats（JSON）。"""
+        self.con.execute(
+            "UPDATE source_documents SET import_stats=? WHERE id=?",
+            (json.dumps(self.stats, ensure_ascii=False), doc_id))
 
     # ---- 指紋合併寫入（健保側） ----
     def insert_fp_record(self, table, record, *, profile_id, doc_id, section,

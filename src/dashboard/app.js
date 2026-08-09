@@ -123,6 +123,23 @@
     </svg></div><p class="note">每根長條＝一次處方，高度＝給藥日數（滑過看明細）</p>`;
   }
 
+  const STAT_ZH = { encounters: "就醫", medications: "用藥", lab_results: "檢驗",
+    reports: "報告", immunizations: "疫苗", body_measurements: "身體數值",
+    cancer_screenings: "癌篩", apple_records: "量測", apple_workouts: "運動" };
+
+  function importSummary(statsJson) {
+    if (!statsJson) return "（早期匯入，無統計）";
+    try {
+      const st = JSON.parse(statsJson);
+      const parts = Object.entries(st.inserted || {})
+        .filter(([, n]) => n > 0)
+        .map(([k, n]) => `${STAT_ZH[k] || k} +${n.toLocaleString()}`);
+      const dup = Object.values(st.skipped_dup || {}).reduce((a, b) => a + b, 0);
+      if (dup) parts.push(`重複略過 ${dup.toLocaleString()}`);
+      return parts.join("、") || "無新增（內容均已存在）";
+    } catch (e) { return "—"; }
+  }
+
   /* ---------- 總覽（洞察式摘要卡） ---------- */
   function Overview({ go }) {
     const c = DATA.meta.counts;
@@ -173,10 +190,14 @@
             <td class="dt">${e.date}</td><td><${Chip} type=${e.type} /></td>
             <td>${e.facility_name}</td><td class="dt">${e.dx_name || ""}</td></tr>`)}</table>
         </${Card}>
-        <${Card} wide icon="🗂" color="var(--ink2)" title="資料庫">
+        <${Card} wide icon="🗂" color="var(--ink2)" title="資料庫與匯入紀錄">
           <p class="note">就醫 ${c.encounters}｜用藥 ${c.medications}｜檢驗 ${c.lab_results}｜
-            報告 ${c.reports}｜疫苗 ${c.immunizations}｜Apple 量測 ${c.apple_records.toLocaleString()}。
-            來源：${DATA.meta.sources.map((s) => s.filename).join("、")}。</p>
+            報告 ${c.reports}｜疫苗 ${c.immunizations}｜Apple 量測 ${c.apple_records.toLocaleString()}</p>
+          <table><tr><th>匯入時間</th><th>檔案</th><th>來源</th><th>新增內容</th></tr>
+            ${DATA.meta.sources.map((s) => html`<tr>
+              <td class="dt">${s.imported_at}</td><td>${s.filename}</td>
+              <td class="dt">${s.adapter === "nhi_json" ? "健保存摺" : "Apple 健康"}</td>
+              <td class="dt">${importSummary(s.import_stats)}</td></tr>`)}</table>
         </${Card}>
       </div>
     </section>`;

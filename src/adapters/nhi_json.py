@@ -298,6 +298,7 @@ class NhiJsonAdapter:
         reconciliation = {"expected_in_file": med_expected, "inserted_new": med_inserted,
                           "note": "重複匯入時 inserted_new < expected_in_file 為正常（紀錄已存在）"}
 
+        store.finalize_import(doc_id)
         report = build_incremental(
             store, sections=sections,
             source_info={"filename": path.name, "sha256": sha256,

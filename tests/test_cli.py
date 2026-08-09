@@ -21,7 +21,7 @@ def test_help():
 def test_status_empty_db(tmp_path):
     r = run_cli("--db", str(tmp_path / "s.sqlite"), "status")
     assert r.returncode == 0
-    assert "schema 版本：1" in r.stdout
+    assert "schema 版本：2" in r.stdout
     assert "encounters: 0" in r.stdout
 
 

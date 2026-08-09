@@ -128,3 +128,33 @@ def test_same_file_registered_once(ctx):
     store, pid, doc_id = ctx
     doc2, imported_at = store.register_source(pid, "f.json", "a" * 64, "nhi_json", "1.0")
     assert doc2 == doc_id and imported_at is not None
+
+
+def test_schema_migration_v1_to_v2(tmp_path):
+    """v1 資料庫開啟時自動前向遷移至現行版本。"""
+    import sqlite3
+    from src.store.schema import DDL, SCHEMA_VERSION
+    db = tmp_path / "old.sqlite"
+    con = sqlite3.connect(db)
+    con.executescript(DDL.replace(
+        "import_stats TEXT,\n    imported_at", "imported_at"))  # 模擬 v1 無該欄位
+    con.execute("INSERT INTO schema_version(version) VALUES (1)")
+    con.commit(); con.close()
+    s = Store(db)
+    assert s.schema_version() == SCHEMA_VERSION
+    cols = [r[1] for r in s.con.execute("PRAGMA table_info(source_documents)")]
+    assert "import_stats" in cols
+    s.close()
+
+
+def test_finalize_import_stats(ctx):
+    store, pid, doc_id = ctx
+    store.insert_fp_record("encounters", {"r1.5": "20260101"}, profile_id=pid,
+                           doc_id=doc_id, section="r1", source_index=0,
+                           columns={"type": "western_outpatient"})
+    store.finalize_import(doc_id)
+    store.commit()
+    import json
+    raw = store.con.execute(
+        "SELECT import_stats FROM source_documents WHERE id=?", (doc_id,)).fetchone()[0]
+    assert json.loads(raw)["inserted"]["encounters"] == 1

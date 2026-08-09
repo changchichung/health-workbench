@@ -1,6 +1,6 @@
 """health-database schema：全表 profile_id、來源追溯、quality_flags、版本化。"""
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 DDL = """
 CREATE TABLE IF NOT EXISTS schema_version(
@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS source_documents(
     sha256 TEXT NOT NULL UNIQUE,
     adapter TEXT NOT NULL,
     adapter_version TEXT NOT NULL,
+    import_stats TEXT,
     imported_at TEXT NOT NULL DEFAULT (datetime('now')));
 
 CREATE TABLE IF NOT EXISTS encounters(
@@ -174,6 +175,11 @@ CREATE TABLE IF NOT EXISTS apple_workouts(
     quality_flags TEXT NOT NULL DEFAULT '',
     UNIQUE(profile_id, activity, start_ts, end_ts, source_name));
 """
+
+# 前向遷移：{來源版本: [SQL, ...]}，逐版執行至 SCHEMA_VERSION
+MIGRATIONS = {
+    1: ["ALTER TABLE source_documents ADD COLUMN import_stats TEXT"],
+}
 
 # 帶指紋合併語意的健保紀錄表（碰撞防禦與 superseded 偵測作用對象）
 FP_TABLES = ["encounters", "lab_results", "reports", "immunizations",

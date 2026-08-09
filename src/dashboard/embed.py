@@ -110,7 +110,8 @@ def build_payload(store, db_path):
             "profile": con.execute("SELECT display_name FROM profiles LIMIT 1").fetchone()[0],
             "counts": store.table_counts(),
             "sources": [dict(r) for r in con.execute(
-                "SELECT filename, adapter, imported_at FROM source_documents")],
+                "SELECT filename, adapter, imported_at, import_stats"
+                " FROM source_documents ORDER BY imported_at")],
             "drug_cache": drug_cache_meta,
         },
         "encounters": encounters,
