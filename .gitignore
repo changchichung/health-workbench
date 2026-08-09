@@ -1,6 +1,8 @@
 data/
 phase0/output/
 *.sqlite
+# 例外：健保藥品品項快取（開放資料非個資，隨 bundle 發佈）
+!app/src-tauri/resources/drug_items.sqlite
 *.db
 
 # Spectra app data

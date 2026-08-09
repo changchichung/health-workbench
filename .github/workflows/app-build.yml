@@ -1,0 +1,72 @@
+# tauri-desktop-app CI（design D6）：測試＋守衛 → 雙平台建置。
+# 個資紀律：CI 僅用去識別化 fixtures，一律不得引用個資目錄。
+name: app-build
+
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", "src/**", "tests/**", ".github/workflows/app-build.yml"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安裝 Python 依賴（oracle 端）
+        run: pip install pyyaml
+      - name: 守衛：src-tauri 業務邏輯零命中
+        run: |
+          ! grep -rEn "parse|adapter|schema|fingerprint|knowledge|quality_flag" app/src-tauri/src/
+      - name: 守衛：workflow 不引用個資目錄
+        run: |
+          ! grep -n "d""ata/" .github/workflows/app-build.yml
+      - name: node 測試全套（含 parity fixture、禁用詞、labs.json 新鮮度）
+        working-directory: app
+        run: |
+          npm ci
+          npm test
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            bundle_glob: |
+              app/src-tauri/target/release/bundle/dmg/*.dmg
+              app/src-tauri/target/release/bundle/macos/*.app/**
+          - platform: windows-latest
+            bundle_glob: |
+              app/src-tauri/target/release/bundle/nsis/*.exe
+              app/src-tauri/target/release/bundle/msi/*.msi
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - name: npm 依賴
+        working-directory: app
+        run: npm ci
+      - name: Tauri 建置（不簽章）
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: app
+      - name: 上傳安裝包
+        uses: actions/upload-artifact@v4
+        with:
+          name: myhealthbank-${{ matrix.platform }}
+          path: ${{ matrix.bundle_glob }}
+          if-no-files-found: error

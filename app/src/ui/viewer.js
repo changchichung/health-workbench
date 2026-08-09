@@ -13,11 +13,18 @@ export function createViewer({ getDriver, getDbPath, labEntries }) {
   const emptyEl = document.getElementById("viewer-empty");
   const exportBtn = document.getElementById("export-html-btn");
 
+  // 解析順序：db 同目錄（使用者可自行更新快取，Python 慣例）→ bundle 資源
   async function drugCachePath() {
+    const t = window.__TAURI__;
     const dir = getDbPath().replace(/[/\\][^/\\]+$/, "");
     const sep = dir.includes("\\") ? "\\" : "/";
-    const p = `${dir}${sep}drug_items.sqlite`;
-    return (await window.__TAURI__.fs.exists(p).catch(() => false)) ? p : null;
+    const local = `${dir}${sep}drug_items.sqlite`;
+    if (await t.fs.exists(local).catch(() => false)) return local;
+    try {
+      const bundled = await t.path.resolveResource("resources/drug_items.sqlite");
+      if (await t.fs.exists(bundled)) return bundled;
+    } catch { /* resource 未配置時走 null */ }
+    return null;
   }
 
   async function refresh() {
