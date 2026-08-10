@@ -1,5 +1,6 @@
 // driver 契約 smoke（task 1.3）：同一份程式碼由 node:test（NodeDriver）
-// 與 App 內 spike（TauriDriver）各跑一次，輸出必須全等。
+// 與 App 內（TauriDriver，apply 期以 dev spike 驅動、輸出全等已驗證）
+// 各跑一次的共用例程；保留供日後 driver 改動時複驗。
 import { initSchema } from "./schema.js";
 
 const COLS = ["profile_id", "doc_id", "activity", "start_ts", "end_ts",

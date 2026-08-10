@@ -7,52 +7,60 @@
 > 本工具僅協助整理、搜尋與視覺化使用者自行提供的健康資料，不提供診斷、
 > 治療、用藥或其他醫療判斷建議。如有醫療問題，請諮詢合格醫事人員。
 
-## 使用流程
+## 桌面 App（v0.3 起的主要使用方式）
+
+不用懂程式：開啟 **MyHealthBank** App，把檔案拖進視窗即可。
 
 ```
 1. 下載自己的資料
    - 健保：登入健康存摺（myhealthbank.nhi.gov.tw）→ 下載「醫療類」
-     JSON 與 XML（建議兩種都下載；工具以 JSON 為主）
+     JSON 或 XML（兩種都支援）
    - Apple：iPhone 健康 App → 個人頭像 → 匯出所有健康資料 → 把
-     apple_health_export（zip 或解壓後資料夾）傳到電腦
+     apple_health_export（zip 或資料夾）傳到電腦
 
-2. 匯入（自動判型、可重複執行、冪等累加）
-   bin/mhb import ~/Downloads/健康存摺醫療類_YYYMMDD.JSON
-   bin/mhb import ~/Downloads/apple_health_export
-   （bin/mhb 任何目錄皆可執行；等價於在 repo 內跑 python3 -m src.mhb_cli）
-
-3. 開啟 dashboard（匯入後自動產出；也可手動重建）
-   bin/mhb rebuild
-   open data/dashboard_YYYYMMDD-private.html
-   （舊的 dashboard_*.html 都是完整快照，確認新檔正常後可自行刪除）
+2. 匯入：拖進 App 視窗（或點擊選檔）→ 確認 → 看進度與結果報告
+   - 自動判型、重複匯入自動跳過、不同人的檔案會被阻擋
+3. 檢視：「資料檢視」分頁即完整儀表板（總覽/時間軸/用藥/趨勢＋搜尋）
+4. 分享到 iPad 等裝置：「匯出單檔 HTML…」（檔案含全部個資，請妥善保管）
 ```
 
-每隔一段時間（例如每月）重複以上流程：健保三年滾動視窗會被自動
+安裝包由 GitHub Actions 產出（macOS dmg／Windows 安裝檔，見 Actions
+artifacts）；本機建置：`cd app && npm ci && npx tauri build`。
+產物未簽章：自建自用不受影響；分發他人前需補簽章（backlog）。
+
+## CLI（開發者路徑）
+
+`src/`（Python）自 v0.3 起凍結新功能，僅修 bug；作為 App 匯入引擎的
+差分驗收 oracle 持續存在。用法不變：
+
+```
+bin/mhb import <下載檔或資料夾>   # 匯入（自動判型、冪等累加）
+bin/mhb rebuild                  # 產出單檔 dashboard（data/*.html）
+bin/mhb status / quality         # 筆數 / 全庫品質報告
+bin/mhb knowledge update         # 更新健保藥品品項快取（建議每季）
+```
+
+每隔一段時間（例如每月）重複下載＋匯入：健保三年滾動視窗會被自動
 累積合併成不斷加深的個人縱深，重複資料不會重複入庫。
-
-### 其他命令
-
-```
-bin/mhb status              # schema 版本與各表筆數
-bin/mhb quality             # 全庫品質報告（唯讀）
-bin/mhb knowledge update    # 更新健保藥品品項快取（手動觸發，建議每季）
-```
-
-想全域使用可建立捷徑：`ln -s "$(pwd)/bin/mhb" /usr/local/bin/mhb`
 
 ## 隱私與資料位置
 
-- 個人資料全部在 `data/`（原始下載檔、SQLite 資料庫、dashboard 單檔），
-  已列入 `.gitignore`，NEVER 進版本控制。
-- dashboard 檔名帶 `-private` 後綴且頁首有紅字提醒：**單檔內含全部
-  嵌入資料，請勿外傳**。
-- 刪除全部資料：刪掉 `data/` 目錄即可（原始下載檔請自行另存或一併刪除）。
-- 檢視 dashboard 零網路請求；藥品仿單等外部連結僅在點擊時才離開頁面。
+- App 資料庫在系統應用程式資料目錄（macOS：`~/Library/Application
+  Support/com.notoriouslab.myhealthbank/`）；CLI 資料在 `data/`。
+  兩者皆 NEVER 進版本控制（`data/` 已 gitignore）。
+- 匯出的 dashboard 單檔帶 `-private` 字樣且頁首有紅字提醒：**內含
+  全部嵌入資料，請勿外傳**。
+- 刪除全部資料：刪掉上述目錄即可。
+- 檢視零網路請求；藥品仿單等外部連結僅在點擊時才離開頁面。
 - `knowledge update` 是唯一主動連網的命令（下載健保藥品品項開放資料集）。
 
 ## 開發
 
-- Python 3.13 標準庫 + PyYAML；前端 Preact + htm（vendored，免 build）。
-- 測試：`python3 -m pytest tests/`；端到端：`scripts/e2e_idempotency.sh`。
-- 規格 SSOT：`openspec/`；Phase 0 格式研究：`docs/20260808_phase0_findings.md`。
+- App：Tauri 2（Rust 殼僅 SQLite 橋與插件，業務邏輯全在 `app/src/` JS）；
+  前端 Preact + htm（vendored，免 build）。
+- Python 3.13 標準庫 + PyYAML（oracle 與 CLI）。
+- 測試：`cd app && npm test`（55 項，含與 Python 的差分對帳）；
+  `python3 -m pytest tests/`；端到端：`scripts/e2e_idempotency.sh`。
+- CI：`.github/workflows/app-build.yml`（測試＋守衛 → 雙平台建置）。
+- 規格 SSOT：`openspec/`；格式研究：`docs/20260808_phase0_findings.md`。
 - `phase0/` 為已封存的探索原型，不再演進。

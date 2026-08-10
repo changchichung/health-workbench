@@ -1,6 +1,5 @@
 // App 前端入口。Tauri API 走 withGlobalTauri（window.__TAURI__），
 // 引擎模組（engine/、adapters/、store/）維持純 ESM，Node 測試可直接 import。
-import { maybeRunSpike } from "./spike.js";
 import { TauriDriver } from "../store/tauri_driver.js";
 import { initSchema, SCHEMA_VERSION } from "../store/schema.js";
 import { resolveDbPath, importExistingDb } from "../store/location.js";
@@ -143,13 +142,7 @@ async function wireUi() {
 
 if (window.__TAURI__) {
   boot()
-    .then(async (info) => {
-      await wireUi();
-      await maybeRunSpike(statusEl, {
-        app, boot, importExisting, bootInfo: info,
-        flow: app.flow, refreshStatus,
-      });
-    })
+    .then(() => wireUi())
     .catch((err) => { statusEl.textContent = `啟動失敗：${err.message || err}`; });
 } else {
   statusEl.textContent = "非 Tauri 環境（瀏覽器預覽模式）。";

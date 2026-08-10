@@ -120,10 +120,8 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
         : source;
       result = await adapter.importSource(src, getDriver(), progress, {
         labEntries,
-        // 面板已揭露歸戶資訊並經「開始匯入」確認；peek 失敗時退原生對話框。
-        // __MHB_TEST_ASSUME_PROFILE__＝dev spike 無頭旗標（隨 spike.js 移除）
-        assumeProfile: pending.assumeProfile
-          || window.__MHB_TEST_ASSUME_PROFILE__ === true,
+        // 面板已揭露歸戶資訊並經「開始匯入」確認；peek 失敗時退原生對話框
+        assumeProfile: pending.assumeProfile,
         confirmNewProfile: async (maskedId) => {
           const ask = window.__TAURI__.dialog.ask || window.__TAURI__.dialog.default?.ask;
           return ask(`首次匯入：以遮罩身分證 ${maskedId} 建立本人資料？`,
