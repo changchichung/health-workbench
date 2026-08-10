@@ -4,7 +4,8 @@
 // 事實來源，檢視相關介面（狀態列/檢視頁）跟當前成員，匯入紀錄卡全庫。
 import { TauriDriver } from "../store/tauri_driver.js";
 import { initSchema, SCHEMA_VERSION } from "../store/schema.js";
-import { resolveDbPath, importExistingDb } from "../store/location.js";
+import { resolveDbPath, importExistingDb, backupFileName, exportDbSnapshot }
+  from "../store/location.js";
 import { loadSettings, saveSettings, resolveCurrentProfile } from "../store/settings.js";
 import { listProfiles } from "../engine/profiles.js";
 import { createImportFlow } from "./import_flow.js";
@@ -28,7 +29,7 @@ const app = { driver: null, dbPath: null, dbDir: null, currentProfileId: null,
   flow: null, viewer: null, history: null, manager: null };
 
 const esc = (s) => String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;")
-  .replaceAll(">", "&gt;");
+  .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 
 async function tableCounts(driver, profileId) {
   const tables = ["encounters", "medications", "lab_results", "apple_records"];
@@ -193,10 +194,14 @@ async function wireUi() {
     getProfileId: () => app.currentProfileId,
     getExportStartDir: () => dialogStartDir("export"),
     labEntries,
+    onNotify: notify,
   });
   app.history = createHistory({
     getDriver: () => app.driver,
     getDbPath: () => app.dbPath,
+    // 救援（刪除/改歸屬）後統一收斂：切換器＋狀態列＋檢視頁＋本卡
+    onRescued: async () => { await setCurrentProfile(app.currentProfileId); },
+    notify,
   });
   app.manager = createProfileManager({
     getDriver: () => app.driver,
@@ -206,12 +211,32 @@ async function wireUi() {
       app.flow?.resetPanel();
       await setCurrentProfile(app.currentProfileId);
     },
-    // 進階：匯入既有資料庫檔（2026-08-10 裁示自工具列降級收進面板；
+    // 進階：匯入既有資料庫檔（2026-08-10 決定自工具列降級收進面板；
     // 用途＝換電腦搬資料、舊 CLI 庫一次性遷移）
     onImportDbFile: async () => {
       const p = await dialogOpen({ multiple: false, title: "選擇既有的 mhb.sqlite" });
       if (!p) return { ok: false, reason: "cancelled" };
       return importExisting(p);
+    },
+    // 匯出資料庫檔（app-shell spec）：VACUUM INTO 一致性快照，
+    // 經 rusqlite 直寫不受 fs scope 限制；同名檔案預檢拒絕零寫入
+    onExportDbFile: async () => {
+      const t = window.__TAURI__;
+      const save = t.dialog.save || t.dialog.default?.save;
+      const startDir = await dialogStartDir("export");
+      const name = backupFileName(new Date().toISOString().slice(0, 10));
+      const target = await save({
+        title: "匯出資料庫檔（含全部成員個資，請妥善保管）",
+        defaultPath: startDir ? `${startDir}/${name}` : name,
+      });
+      if (!target) return { ok: false, reason: "cancelled" };
+      if (await t.fs.exists(target).catch(() => false)) {
+        return { ok: false, reason: "exists", path: target };
+      }
+      await exportDbSnapshot(app.driver, target);
+      await rememberDialogDir("export", target);
+      const bytes = await t.fs.stat(target).then(s => s.size).catch(() => null);
+      return { ok: true, path: target, bytes };
     },
   });
   app.flow = createImportFlow({
@@ -283,13 +308,19 @@ async function wireUi() {
       await app.flow.offerFile(p);
     }
   });
-  document.getElementById("gh-copy-btn").addEventListener("click", async () => {
+  // opener 插件到位後改直接開瀏覽器（2026-08-11 指示；剪貼簿方案退場），
+  // 開啟失敗回退複製，確保任何情況都有路可走
+  document.getElementById("gh-open-btn").addEventListener("click", async () => {
     const url = "https://github.com/notoriouslab/myhealthbank";
     try {
-      await navigator.clipboard.writeText(url);
-      notify("已複製 GitHub 連結，貼到瀏覽器開啟即可。");
+      await window.__TAURI__.opener.openUrl(url);
     } catch {
-      notify(`請手動複製：${url}`);
+      try {
+        await navigator.clipboard.writeText(url);
+        notify("無法直接開啟，已複製連結，貼到瀏覽器開啟即可。");
+      } catch {
+        notify(`請手動前往：${url}`);
+      }
     }
   });
 

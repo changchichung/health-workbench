@@ -12,6 +12,8 @@ import { initSchema } from "../../src/store/schema.js";
 import { nhiJsonAdapter } from "../../src/adapters/nhi_json.js";
 import { appleHealthAdapter } from "../../src/adapters/apple_health.js";
 import { createProfile } from "../../src/engine/profiles.js";
+import { deleteSourceDocument, reattributeSourceDocument }
+  from "../../src/engine/doc_rescue.js";
 
 const ALL_TABLES = ["profiles", "source_documents", "encounters", "medications",
   "lab_results", "reports", "immunizations", "body_measurements",
@@ -235,6 +237,55 @@ test("首次綁定屬白名單：masked_id null→值 通過、其他欄位變�
   assert.equal(r.status, "ok");
   assertOnlyWhitelisted(before, await snapshot(d),
     { allowNewFor: p, allowBindProfile: p });
+  await d.close();
+});
+
+// ---------- 誤歸屬救援中斷情境（misattribution-rescue design D6） ----------
+// 負向自檢紀錄（2026-08-10）：暫時將 sabotage 的 execute 改為靜默吞掉
+// 目標語句（不丟錯、不執行），兩情境均如預期轉紅（D7-8 抓到
+// source_documents 列殘留、D7-9 抓到 profile_id 遭非白名單修改），
+// 確認斷言有效後移除。
+
+test("D7-8 刪除匯入中途失敗：交易回滾，全庫與操作前全等", async () => {
+  const { d } = await baseline();
+  const [{ id: docId }] = await d.select(
+    "SELECT id FROM source_documents WHERE filename='a1.json'");
+  const before = await snapshot(d);
+  // 故障點＝最後的 source_documents DELETE：關聯列已全刪＝最大部分狀態
+  const sabotaged = Object.create(d);
+  sabotaged.execute = (sql, params) => {
+    if (/DELETE FROM source_documents/.test(sql)) throw new Error("模擬中途故障");
+    return d.execute(sql, params);
+  };
+  sabotaged.transaction = (fn) =>
+    NodeDriver.prototype.transaction.call(d, () => fn(sabotaged));
+  await assert.rejects(() => deleteSourceDocument(sabotaged, docId), /模擬中途故障/);
+  assertUnchanged(before, await snapshot(d));
+  await d.close();
+});
+
+test("D7-9 改歸屬中途失敗：交易回滾，全庫與操作前全等", async () => {
+  const { d, b } = await baseline();
+  const c = await createProfile(d, "爸爸");
+  const [{ id: docId }] = await d.select(
+    "SELECT id FROM source_documents WHERE filename='b1.json'");
+  const before = await snapshot(d);
+  // 故障點＝doc 改掛（各資料表已搬完＝最大部分狀態；此後還有綁定轉移）
+  const sabotaged = Object.create(d);
+  sabotaged.execute = (sql, params) => {
+    if (/UPDATE source_documents SET profile_id/.test(sql)) {
+      throw new Error("模擬中途故障");
+    }
+    return d.execute(sql, params);
+  };
+  sabotaged.transaction = (fn) =>
+    NodeDriver.prototype.transaction.call(d, () => fn(sabotaged));
+  await assert.rejects(
+    () => reattributeSourceDocument(sabotaged, docId, c), /模擬中途故障/);
+  assertUnchanged(before, await snapshot(d));
+  const [{ masked_id }] = await d.select(
+    "SELECT masked_id FROM profiles WHERE id=?", [b]);
+  assert.equal(masked_id, "B98765****", "來源綁定不得因失敗操作被解除");
   await d.close();
 });
 

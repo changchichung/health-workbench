@@ -51,3 +51,15 @@ export async function importExistingDb(srcPath, destPath, openDriver, supportedV
   await window.__TAURI__.fs.copyFile(srcPath, destPath);
   return { ok: true, version: check.version };
 }
+
+// 匯出備份檔名：日期戳降低同名機率（app-shell spec 匯出資料庫檔）
+export function backupFileName(isoDate) {
+  return `mhb-backup-${isoDate.replaceAll("-", "")}.sqlite`;
+}
+
+// 一致性快照匯出：SQLite VACUUM INTO（單一交易視角、不中斷主庫、
+// 輸出緊實化單檔，可直接被 importExistingDb 讀回）。目標檔案已存在
+// 時 SQLite 直接拒絕（呼叫端先以 fs.exists 預檢給友善訊息）。
+export async function exportDbSnapshot(driver, destPath) {
+  await driver.execute("VACUUM INTO ?", [destPath]);
+}

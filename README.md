@@ -1,75 +1,85 @@
-# myhealthbank — 個人健康資料工作台
+<div align="center">
 
-把台灣健保「健康存摺」下載檔與 Apple 健康匯出，整理成可累積、可搜尋、
-可帶去回診討論的本機個人健康紀錄。**所有資料只留在你的裝置上**，
-不需要帳號、不上傳雲端、檢視時不需要網路。
+# MyHealthBank — 個人健康資料工作台
 
-> 本工具僅協助整理、搜尋與視覺化使用者自行提供的健康資料，不提供診斷、
+**把健保「健康存摺」與 Apple 健康的下載檔，變成一份越養越深、可搜尋、
+可帶去回診討論的家庭健康紀錄。全程本機，資料不離開你的電腦。**
+
+macOS／Windows 桌面 App · 不需要帳號 · 檢視時不需要網路
+
+</div>
+
+---
+
+> 本工具僅協助整理、搜尋與視覺化你自行提供的健康資料，不提供診斷、
 > 治療、用藥或其他醫療判斷建議。如有醫療問題，請諮詢合格醫事人員。
 
-## 桌面 App（v0.3 起的主要使用方式）
+## 這是什麼？
 
-不用懂程式：開啟 **MyHealthBank** App，把檔案拖進視窗即可。
+健保署的「健康存摺」只保留三年資料，Apple 健康的匯出檔又大又難讀。
+MyHealthBank 把兩邊的下載檔整理進同一個本機資料庫：每隔一陣子把新
+下載的檔案拖進來，三年視窗就被接成不斷加深的個人縱深，重複的部分
+自動跳過，不會越匯越亂。
 
-```
-1. 下載自己的資料
+打開 App 就是完整的健康儀表板：總覽、就醫時間軸、用藥清單（附成分
+與官方仿單連結）、檢驗趨勢，還有全文搜尋。要給家人或帶去診間，
+一鍵匯出單一 HTML 檔，任何裝置的瀏覽器都能直接開。
+
+## 快速上手（三步）
+
+1. **下載自己的資料**
    - 健保：登入健康存摺（myhealthbank.nhi.gov.tw）→ 下載「醫療類」
-     資料（建議 JSON，內容比 XML 完整；兩種都支援）
-   - Apple：Apple 健康 App（iPhone）→ 個人頭像 → 匯出所有健康資料
-     （Apple Watch 的紀錄會一併包含）→ 把
-     apple_health_export（zip 或資料夾）傳到電腦
+     資料（建議 JSON；XML 也支援）
+   - Apple：iPhone 健康 App → 個人頭像 → 匯出所有健康資料 → 把
+     匯出檔（zip 或資料夾）傳到電腦
+2. **拖進 App**：選擇這份資料屬於哪位成員 → 開始匯入。格式自動判別、
+   重複自動跳過；健保檔會用遮罩身分證核對成員，選錯人會被擋下。
+3. **看與分享**：「資料檢視」分頁直接看；「匯出單檔 HTML…」給
+   iPad 或家人（僅含當前成員的資料，檔案含個資請妥善保管）。
 
-2. 匯入：拖進 App 視窗（或點擊選檔）→ 選擇這份資料屬於哪位成員 →
-   按「開始匯入」→ 看進度與結果報告
-   - 自動判型、重複匯入自動跳過；健保檔以遮罩身分證驗證歸屬，
-     選錯成員會被阻擋
-3. 檢視：「資料檢視」分頁即完整儀表板（總覽/時間軸/用藥/趨勢＋搜尋）；
-   header 成員切換器一鍵切換家庭成員（v0.4 起支援多人）
-4. 分享到其他裝置：「匯出單檔 HTML…」，任何裝置的瀏覽器都能直接開啟
-   （僅含當前成員的資料；檔案含個資，請妥善保管）
-```
+## 全家共用一台電腦
 
-多位家庭成員共用同一台電腦：header「管理成員…」可新增、改名、刪除
-成員（刪除連帶該成員全部資料，需輸入名稱確認；原始下載檔仍在，可
-重新匯入）。換電腦搬資料：管理成員面板底部「匯入既有資料庫檔…」。
+- **成員管理**：新增、改名、刪除成員（刪除會連同該成員全部資料，
+  需輸入名稱確認）。
+- **一鍵切換**：視窗右上角切換成員，儀表板即時跟著換人。
+- **匯錯人也救得回來**：匯入紀錄裡每份檔案都能「改歸屬」搬給正確
+  的成員（原始檔刪了也沒關係），或「刪除」後重新匯入；操作前都有
+  明細預覽與確認。
+- **備份與搬家**：「匯出資料庫檔…」存一份完整備份，到新電腦用
+  「匯入既有資料庫檔…」整庫接回。
 
-安裝包由 GitHub Actions 產出（macOS dmg／Windows 安裝檔，見 Actions
-artifacts）；本機建置：`cd app && npm ci && npx tauri build`。
-產物未簽章：自建自用不受影響；分發他人前需補簽章（backlog）。
+## 隱私設計
 
-## CLI（開發者路徑）
+- 資料只存在你電腦的系統應用程式資料目錄（macOS：
+  `~/Library/Application Support/com.notoriouslab.myhealthbank/`），
+  不上傳、不註冊、不追蹤。
+- 檢視過程零網路請求；只有點擊藥品仿單這類外部連結時才會開瀏覽器。
+- 匯出的儀表板檔名帶 `-private` 字樣、頁首有紅字提醒，內含全部
+  嵌入資料，請勿外傳。
+- 想清空一切：刪掉上面那個資料夾就結束了。
 
-`src/`（Python）自 v0.3 起凍結新功能，僅修 bug；作為 App 匯入引擎的
-差分驗收 oracle 持續存在。用法不變：
+## 安裝
 
-```
-bin/mhb import <下載檔或資料夾>   # 匯入（自動判型、冪等累加）
-bin/mhb rebuild                  # 產出單檔 dashboard（data/*.html）
-bin/mhb status / quality         # 筆數 / 全庫品質報告
-bin/mhb knowledge update         # 更新健保藥品品項快取（建議每季）
-```
+安裝包由 GitHub Actions 自動建置（macOS dmg／Windows 安裝檔，見
+Actions artifacts）；或本機建置：`cd app && npm ci && npx tauri build`。
+產物尚未簽章，自建自用不受影響；分發他人前需補簽章。
 
-每隔一段時間（例如每月）重複下載＋匯入：健保三年滾動視窗會被自動
-累積合併成不斷加深的個人縱深，重複資料不會重複入庫。
+---
 
-## 隱私與資料位置
+## 開發者資訊
 
-- App 資料庫在系統應用程式資料目錄（macOS：`~/Library/Application
-  Support/com.notoriouslab.myhealthbank/`）；CLI 資料在 `data/`。
-  兩者皆 NEVER 進版本控制（`data/` 已 gitignore）。
-- 匯出的 dashboard 單檔帶 `-private` 字樣且頁首有紅字提醒：**內含
-  全部嵌入資料，請勿外傳**。
-- 刪除全部資料：刪掉上述目錄即可。
-- 檢視零網路請求；藥品仿單等外部連結僅在點擊時才離開頁面。
-- `knowledge update` 是唯一主動連網的命令（下載健保藥品品項開放資料集）。
-
-## 開發
-
-- App：Tauri 2（Rust 殼僅 SQLite 橋與插件，業務邏輯全在 `app/src/` JS）；
-  前端 Preact + htm（vendored，免 build）。
-- Python 3.13 標準庫 + PyYAML（oracle 與 CLI）。
-- 測試：`cd app && npm test`（99 項，含與 Python 的差分對帳）；
-  `python3 -m pytest tests/`；端到端：`scripts/e2e_idempotency.sh`。
-- CI：`.github/workflows/app-build.yml`（測試＋守衛 → 雙平台建置）。
-- 規格 SSOT：`openspec/`；格式研究：`docs/20260808_phase0_findings.md`。
-- `phase0/` 為已封存的探索原型，不再演進。
+- **App**：Tauri 2（Rust 殼只做 SQLite 橋與插件，業務邏輯全在
+  `app/src/` 的 JS）；前端 Preact + htm（原始碼直接入庫，免建置）。
+- **命令列工具**：`src/`（Python 3.13 標準庫 + PyYAML）自 v0.3 起
+  凍結新功能，作為 App 匯入引擎的差分驗收基準。常用：
+  `bin/mhb import <檔案>`、`bin/mhb rebuild`、`bin/mhb status`、
+  `bin/mhb knowledge update`（更新藥品品項快取，唯一主動連網的命令）。
+- **測試**：`cd app && npm test`（128 項，含與 Python 的逐位元組
+  差分對帳、匯入與救援操作的非破壞性紅隊矩陣）；
+  `python3 -m pytest tests/`；端到端 `scripts/e2e_idempotency.sh`。
+- **CI**：`.github/workflows/app-build.yml`（測試＋守衛 → 雙平台建置）。
+- **規格**：`openspec/`（Spectra SDD，specs 為單一事實來源）；
+  格式研究 `docs/20260808_phase0_findings.md`；`phase0/` 為已封存的
+  探索原型。
+- **個資紀律**：`data/` 與 App 資料目錄一律不進版本控制；CI 只用
+  合成測試資料。

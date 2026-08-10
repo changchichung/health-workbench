@@ -13,7 +13,7 @@ export function exportFileName(memberName, dateStr) {
 }
 
 export function createViewer({ getDriver, getDbPath, getProfileId,
-  getExportStartDir, labEntries }) {
+  getExportStartDir, labEntries, onNotify }) {
   let assets = null;
   let lastHtml = null;
   let lastMemberName = null;
@@ -22,6 +22,9 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
   const emptyEl = document.getElementById("viewer-empty");
   const exportBtn = document.getElementById("export-html-btn");
   const EMPTY_TEXT = emptyEl.textContent; // 首啟引導原文（載入提示後要還原）
+  // 外部連結攔截掛在 frame 的 load 上（初始化一次，非每次 refresh；
+  // srcdoc 每次重設都會觸發 load 對新 document 重掛委派，避免累積）
+  frame.addEventListener("load", wireExternalLinks);
 
   // 解析順序：db 同目錄（使用者可自行更新快取，Python 慣例）→ bundle 資源
   async function drugCachePath() {
@@ -75,6 +78,30 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
     exportBtn.hidden = false;
     emptyEl.hidden = true;
     return { rendered: true, bytes: lastHtml.length, counts: payload.meta.counts };
+  }
+
+  // 仿單等外部連結：WebView 內 target=_blank 會被 Tauri 攔下無反應
+  //（2026-08-11 使用者走查發現），改經 opener 插件開系統瀏覽器。
+  // srcdoc iframe 與外層同源，可直接掛委派監聽；匯出的單檔 HTML 在
+  // 一般瀏覽器開啟，維持原生 target=_blank 行為不受影響。
+  function wireExternalLinks() {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    doc.addEventListener("click", (e) => {
+      const a = e.target.closest?.("a[href]");
+      if (!a) return;
+      const href = a.getAttribute("href") || "";
+      if (!/^https?:\/\//i.test(href)) return;
+      e.preventDefault();
+      const openUrl = window.__TAURI__?.opener?.openUrl;
+      if (openUrl) {
+        openUrl(href).catch((err) => {
+          onNotify?.(`無法開啟連結：${String(err?.message || err)}`, 10000);
+        });
+      } else {
+        onNotify?.(`此版本無法開啟外部連結，請手動前往：${href}`, 10000);
+      }
+    });
   }
 
   async function exportHtml(destPath = null) {

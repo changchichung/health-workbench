@@ -8,6 +8,10 @@
     "dialog:default",
     "fs:default",
     {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://*" }]
+    },
+    {
       "identifier": "fs:allow-read-file",
       "allow": [{ "path": "**" }]
     },
