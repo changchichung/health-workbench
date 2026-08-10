@@ -1,25 +1,98 @@
-:root { color-scheme: light dark; font-family: system-ui, "PingFang TC", sans-serif; }
+/* App 殼樣式：沿用 dashboard「健康摘要卡」設計 token（雙色系、卡片、膠囊） */
+:root {
+  color-scheme: light dark;
+  --bg: #f2f2f7; --card: #ffffff; --ink: #1c1c1e; --ink2: #8e8e93;
+  --line: #e5e5ea; --accent: #007aff; --good: #34c759; --warn: #eb6834;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000; --card: #1c1c1e; --ink: #ffffff; --ink2: #98989e;
+    --line: #38383a; --accent: #0a84ff; --good: #30d158; --warn: #d95926;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
 html, body { height: 100%; }
-body { margin: 0; }
-#app { height: 100%; display: flex; flex-direction: column; padding: .7rem 1.2rem; box-sizing: border-box; gap: .4rem; }
-.topbar { display: flex; align-items: center; gap: 1.2rem; flex: 0 0 auto; }
-h1 { margin: 0; font-size: 1.1rem; }
-.tabs { display: flex; gap: .3rem; }
-.tabs button { border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: transparent; color: inherit; padding: .3rem .9rem; border-radius: 6px 6px 0 0; cursor: pointer; font-size: .9rem; }
-.tabs button.active { background: color-mix(in srgb, currentColor 12%, transparent); font-weight: 600; }
-#status { margin: 0; font-size: .85rem; opacity: .8; flex: 0 0 auto; }
-.tab-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: .4rem; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.55 -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+}
+#app { height: 100%; display: flex; flex-direction: column; padding: 14px 18px; gap: 10px; }
+
+.topbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; flex: 0 0 auto; }
+h1 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -0.3px; }
+.tabs { display: flex; gap: 8px; }
+.tabs button {
+  font: 600 14px -apple-system, "PingFang TC", sans-serif;
+  min-height: 38px; padding: 8px 18px; border: none; border-radius: 19px;
+  background: var(--card); color: var(--ink); cursor: pointer; box-shadow: var(--shadow);
+}
+.tabs button.active { background: var(--accent); color: #fff; }
+
+#status { margin: 0; font-size: 12.5px; color: var(--ink2); flex: 0 0 auto; }
+
+.tab-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .tab-panel[hidden] { display: none; }
-.toolbar { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: .2rem 0; flex: 0 0 auto; }
-.hint { margin: 0; opacity: .6; font-size: .8rem; flex: 0 0 auto; }
-#import-panel { padding: .6rem .9rem; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 8px; overflow-y: auto; flex: 0 1 auto; min-height: 0; }
-#import-bar { width: 100%; }
-#import-report table { border-collapse: collapse; margin: .5rem 0; }
-#import-report td, #import-report th { border: 1px solid color-mix(in srgb, currentColor 25%, transparent); padding: .2rem .55rem; font-size: .85rem; }
-#import-report h3 { margin: .2rem 0 .4rem; font-size: .95rem; }
-.warn { color: #c0392b; }
-@media (prefers-color-scheme: dark) { .warn { color: #ff8a75; } }
-body.dragover #app { outline: 3px dashed color-mix(in srgb, currentColor 40%, transparent); outline-offset: -6px; }
-.viewer-head { display: flex; align-items: center; gap: 1rem; flex: 0 0 auto; }
-#viewer-empty { margin: .3rem 0; opacity: .65; font-size: .9rem; }
-#viewer-frame { flex: 1 1 auto; min-height: 0; width: 100%; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 8px; background: transparent; }
+
+/* 匯入分頁 */
+#dropzone {
+  flex: 0 0 auto; border: 2px dashed var(--line); border-radius: 14px;
+  background: var(--card); box-shadow: var(--shadow);
+  padding: 26px 20px; text-align: center; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+#dropzone:hover, body.dragover #dropzone { border-color: var(--accent); }
+#dropzone .dz-title { font-size: 17px; font-weight: 700; margin: 0 0 4px; }
+#dropzone .dz-sub { color: var(--ink2); font-size: 13px; margin: 0; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex: 0 0 auto; }
+.toolbar button, .btn {
+  font: 600 13.5px -apple-system, "PingFang TC", sans-serif;
+  min-height: 36px; padding: 7px 14px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--card); color: var(--ink);
+  cursor: pointer; box-shadow: var(--shadow);
+}
+button.primary {
+  background: var(--accent); color: #fff; border: none;
+  font: 600 14px -apple-system, "PingFang TC", sans-serif;
+  min-height: 38px; padding: 8px 20px; border-radius: 10px; cursor: pointer;
+}
+#import-panel {
+  background: var(--card); border: none; border-radius: 14px; box-shadow: var(--shadow);
+  padding: 14px 16px; overflow-y: auto; flex: 0 1 auto; min-height: 0;
+}
+#import-confirm p { margin: .3em 0; }
+#import-confirm .fmt { font-size: 16px; font-weight: 700; }
+#import-confirm .file-chip {
+  display: inline-block; background: var(--bg); border-radius: 8px;
+  padding: 2px 10px; font-size: 13px; color: var(--ink2);
+}
+#import-confirm button { margin: 10px 8px 2px 0; }
+#import-bar { width: 100%; accent-color: var(--accent); height: 8px; }
+#import-progress-text { color: var(--ink2); font-size: 13px; margin: 6px 0 0; }
+#import-report h3 { margin: 2px 0 10px; font-size: 16px; }
+#import-report h3::before { content: "✓ "; color: var(--good); font-weight: 800; }
+#import-report table { border-collapse: collapse; margin: 6px 0 10px; }
+#import-report td, #import-report th {
+  border: none; border-bottom: 1px solid var(--line);
+  padding: 4px 14px 4px 0; font-size: 13.5px; text-align: left;
+}
+#import-report th { color: var(--ink2); font-weight: 600; font-size: 12.5px; }
+#import-report p { margin: .35em 0; font-size: 13.5px; color: var(--ink2); }
+#import-report details { font-size: 13.5px; }
+#goto-viewer-btn {
+  float: right; background: var(--accent); color: #fff; border: none;
+  font: 600 13.5px -apple-system, "PingFang TC", sans-serif;
+  min-height: 34px; padding: 6px 16px; border-radius: 10px; cursor: pointer;
+}
+#import-msg { margin: .2em 0; font-size: 14px; }
+.warn { color: var(--warn); }
+body.dragover #app { outline: 3px dashed var(--accent); outline-offset: -6px; border-radius: 12px; }
+
+/* 檢視分頁 */
+.viewer-head { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+#viewer-empty { margin: 4px 0; color: var(--ink2); font-size: 14px; }
+#viewer-frame {
+  flex: 1 1 auto; min-height: 0; width: 100%; border: none;
+  border-radius: 14px; background: var(--card); box-shadow: var(--shadow);
+}

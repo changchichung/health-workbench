@@ -85,11 +85,11 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
     state = "confirming";
     say("");
     confirmBox.innerHTML = `
-      <p>判型結果：<strong>${escapeHtml(adapter.formatDesc)}</strong></p>
-      <p>檔案：${escapeHtml(source.name)}（${(source.size / 1048576).toFixed(1)}MB）</p>
+      <p class="fmt">${escapeHtml(adapter.formatDesc)}</p>
+      <p><span class="file-chip">${escapeHtml(source.name)}｜${(source.size / 1048576).toFixed(1)}MB</span></p>
       ${profileNote}
-      <button id="import-go" type="button">開始匯入</button>
-      <button id="import-cancel" type="button">取消</button>`;
+      <button id="import-go" type="button" class="primary">開始匯入</button>
+      <button id="import-cancel" type="button" class="btn">取消</button>`;
     show(confirmBox);
     $("import-go").addEventListener("click", () => runImport());
     $("import-cancel").addEventListener("click", () => {

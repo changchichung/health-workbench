@@ -110,7 +110,7 @@ async function wireUi() {
   const { rendered } = await app.viewer.refresh();
   setTab(rendered ? "viewer" : "import");
 
-  document.getElementById("pick-file-btn").addEventListener("click", async () => {
+  document.getElementById("dropzone").addEventListener("click", async () => {
     const p = await dialogOpen({ multiple: false, title: "選擇健保存摺或 Apple 健康匯出檔" });
     if (p) await app.flow.offerFile(p);
   });

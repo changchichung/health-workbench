@@ -18,12 +18,14 @@
     <p id="status">App 殼啟動中…</p>
 
     <section id="tab-import" class="tab-panel" hidden>
+      <div id="dropzone" role="button" tabindex="0">
+        <p class="dz-title">把檔案拖到這裡，或點擊選擇檔案</p>
+        <p class="dz-sub">支援健保存摺 JSON／XML、Apple 健康匯出（zip 或 XML）</p>
+      </div>
       <div class="toolbar">
-        <button id="pick-file-btn" type="button">選擇檔案匯入…</button>
         <button id="pick-dir-btn" type="button">選擇 Apple 匯出資料夾…</button>
         <button id="import-db-btn" type="button">匯入既有資料庫檔…</button>
       </div>
-      <p class="hint">也可以直接把健保存摺 JSON/XML、Apple 健康匯出（zip 或資料夾）拖進視窗。</p>
       <section id="import-panel" hidden>
         <p id="import-msg" hidden></p>
         <div id="import-confirm" hidden></div>
