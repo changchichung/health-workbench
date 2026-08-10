@@ -13,6 +13,17 @@ import { createHistory } from "./history.js";
 import { createProfileManager } from "./profile_manager.js";
 
 const statusEl = document.getElementById("status");
+const noticeEl = document.getElementById("notice");
+
+// 暫時性提示走獨立通知列，NEVER 覆蓋狀態列的成員統計
+// （2026-08-10 走查回饋：複製連結把成員統計行蓋掉了）
+let noticeTimer = null;
+function notify(text, ms = 5000) {
+  noticeEl.textContent = text;
+  noticeEl.hidden = false;
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => { noticeEl.hidden = true; }, ms);
+}
 const app = { driver: null, dbPath: null, dbDir: null, currentProfileId: null,
   flow: null, viewer: null, history: null, manager: null };
 
@@ -219,7 +230,7 @@ async function wireUi() {
     const r = await app.viewer.exportHtml();
     if (r.ok) {
       await rememberDialogDir("export", r.path);
-      statusEl.textContent = `已匯出：${r.path}（${(r.bytes / 1024).toFixed(0)}KB，含全部個資請妥善保管）`;
+      notify(`已匯出：${r.path}（${(r.bytes / 1024).toFixed(0)}KB，含全部個資請妥善保管）`, 10000);
     }
   });
 
@@ -250,9 +261,9 @@ async function wireUi() {
     const url = "https://github.com/notoriouslab/myhealthbank";
     try {
       await navigator.clipboard.writeText(url);
-      statusEl.textContent = "已複製 GitHub 連結，貼到瀏覽器開啟即可。";
+      notify("已複製 GitHub 連結，貼到瀏覽器開啟即可。");
     } catch {
-      statusEl.textContent = `請手動複製：${url}`;
+      notify(`請手動複製：${url}`);
     }
   });
 
