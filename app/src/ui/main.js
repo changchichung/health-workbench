@@ -70,8 +70,17 @@ function dialogOpen(opts) {
   return open(opts);
 }
 
+function setTab(name) {
+  for (const t of ["import", "viewer"]) {
+    document.getElementById(`tab-${t}`).hidden = t !== name;
+    document.getElementById(`tab-btn-${t}`).classList.toggle("active", t === name);
+  }
+}
+
 async function wireUi() {
   const labEntries = await loadLabEntries();
+  document.getElementById("tab-btn-import").addEventListener("click", () => setTab("import"));
+  document.getElementById("tab-btn-viewer").addEventListener("click", () => setTab("viewer"));
   app.viewer = createViewer({
     getDriver: () => app.driver,
     getDbPath: () => app.dbPath,
@@ -80,13 +89,26 @@ async function wireUi() {
   app.flow = createImportFlow({
     getDriver: () => app.driver,
     labEntries,
-    onImported: async () => { await refreshStatus(); await app.viewer.refresh(); },
+    onImported: async () => {
+      await refreshStatus();
+      await app.viewer.refresh();
+      const report = document.getElementById("import-report");
+      if (report && !report.querySelector("#goto-viewer-btn")) {
+        const btn = document.createElement("button");
+        btn.id = "goto-viewer-btn";
+        btn.type = "button";
+        btn.textContent = "前往資料檢視 →";
+        btn.addEventListener("click", () => setTab("viewer"));
+        report.prepend(btn);
+      }
+    },
   });
   document.getElementById("export-html-btn").addEventListener("click", async () => {
     const r = await app.viewer.exportHtml();
     if (r.ok) statusEl.textContent = `已匯出：${r.path}（${(r.bytes / 1024).toFixed(0)}KB，含全部個資請妥善保管）`;
   });
-  await app.viewer.refresh();
+  const { rendered } = await app.viewer.refresh();
+  setTab(rendered ? "viewer" : "import");
 
   document.getElementById("pick-file-btn").addEventListener("click", async () => {
     const p = await dialogOpen({ multiple: false, title: "選擇健保存摺或 Apple 健康匯出檔" });

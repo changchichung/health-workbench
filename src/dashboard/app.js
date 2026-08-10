@@ -196,7 +196,8 @@
           <table><tr><th>匯入時間</th><th>檔案</th><th>來源</th><th>新增內容</th></tr>
             ${DATA.meta.sources.map((s) => html`<tr>
               <td class="dt">${s.imported_at}</td><td>${s.filename}</td>
-              <td class="dt">${s.adapter === "nhi_json" ? "健保存摺" : "Apple 健康"}</td>
+              <td class="dt">${({ nhi_json: "健保存摺（JSON）", nhi_xml: "健保存摺（XML）",
+                apple_health: "Apple 健康" })[s.adapter] || s.adapter}</td>
               <td class="dt">${importSummary(s.import_stats)}</td></tr>`)}</table>
         </${Card}>
       </div>

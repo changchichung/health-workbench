@@ -8,31 +8,38 @@
 </head>
 <body>
   <main id="app">
-    <h1>健康資料工作台</h1>
+    <header class="topbar">
+      <h1>健康資料工作台</h1>
+      <nav class="tabs" role="tablist">
+        <button id="tab-btn-import" type="button" role="tab">匯入資料</button>
+        <button id="tab-btn-viewer" type="button" role="tab">資料檢視</button>
+      </nav>
+    </header>
     <p id="status">App 殼啟動中…</p>
-    <div class="toolbar">
-      <button id="pick-file-btn" type="button">選擇檔案匯入…</button>
-      <button id="pick-dir-btn" type="button">選擇 Apple 匯出資料夾…</button>
-      <button id="import-db-btn" type="button">匯入既有資料庫檔…</button>
-    </div>
-    <p class="hint">也可以直接把健保存摺 JSON/XML、Apple 健康匯出（zip 或資料夾）拖進視窗。</p>
 
-    <section id="import-panel" hidden>
-      <p id="import-msg" hidden></p>
-      <div id="import-confirm" hidden></div>
-      <div id="import-progress" hidden>
-        <progress id="import-bar" max="100" value="0"></progress>
-        <p id="import-progress-text"></p>
+    <section id="tab-import" class="tab-panel" hidden>
+      <div class="toolbar">
+        <button id="pick-file-btn" type="button">選擇檔案匯入…</button>
+        <button id="pick-dir-btn" type="button">選擇 Apple 匯出資料夾…</button>
+        <button id="import-db-btn" type="button">匯入既有資料庫檔…</button>
       </div>
-      <div id="import-report" hidden></div>
+      <p class="hint">也可以直接把健保存摺 JSON/XML、Apple 健康匯出（zip 或資料夾）拖進視窗。</p>
+      <section id="import-panel" hidden>
+        <p id="import-msg" hidden></p>
+        <div id="import-confirm" hidden></div>
+        <div id="import-progress" hidden>
+          <progress id="import-bar" max="100" value="0"></progress>
+          <p id="import-progress-text"></p>
+        </div>
+        <div id="import-report" hidden></div>
+      </section>
     </section>
 
-    <section id="viewer-section">
+    <section id="tab-viewer" class="tab-panel" hidden>
       <div class="viewer-head">
-        <h2>健康資料檢視</h2>
         <button id="export-html-btn" type="button" hidden>匯出單檔 HTML…</button>
       </div>
-      <p id="viewer-empty">匯入資料後，這裡會顯示完整的健康資料儀表板。</p>
+      <p id="viewer-empty">尚無資料。請先到「匯入資料」分頁匯入健保存摺或 Apple 健康匯出檔。</p>
       <iframe id="viewer-frame" title="健康資料儀表板" hidden></iframe>
     </section>
   </main>

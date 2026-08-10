@@ -1,12 +1,18 @@
 :root { color-scheme: light dark; font-family: system-ui, "PingFang TC", sans-serif; }
 html, body { height: 100%; }
 body { margin: 0; }
-#app { height: 100%; display: flex; flex-direction: column; padding: .8rem 1.2rem; box-sizing: border-box; gap: .4rem; }
-h1 { margin: 0; font-size: 1.15rem; }
-#status { margin: 0; font-size: .85rem; opacity: .8; }
-.toolbar { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: .2rem 0; }
-.hint { margin: 0; opacity: .6; font-size: .8rem; }
-#import-panel { padding: .6rem .9rem; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 8px; max-height: 34vh; overflow-y: auto; flex: 0 0 auto; }
+#app { height: 100%; display: flex; flex-direction: column; padding: .7rem 1.2rem; box-sizing: border-box; gap: .4rem; }
+.topbar { display: flex; align-items: center; gap: 1.2rem; flex: 0 0 auto; }
+h1 { margin: 0; font-size: 1.1rem; }
+.tabs { display: flex; gap: .3rem; }
+.tabs button { border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: transparent; color: inherit; padding: .3rem .9rem; border-radius: 6px 6px 0 0; cursor: pointer; font-size: .9rem; }
+.tabs button.active { background: color-mix(in srgb, currentColor 12%, transparent); font-weight: 600; }
+#status { margin: 0; font-size: .85rem; opacity: .8; flex: 0 0 auto; }
+.tab-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: .4rem; }
+.tab-panel[hidden] { display: none; }
+.toolbar { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: .2rem 0; flex: 0 0 auto; }
+.hint { margin: 0; opacity: .6; font-size: .8rem; flex: 0 0 auto; }
+#import-panel { padding: .6rem .9rem; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 8px; overflow-y: auto; flex: 0 1 auto; min-height: 0; }
 #import-bar { width: 100%; }
 #import-report table { border-collapse: collapse; margin: .5rem 0; }
 #import-report td, #import-report th { border: 1px solid color-mix(in srgb, currentColor 25%, transparent); padding: .2rem .55rem; font-size: .85rem; }
@@ -14,8 +20,6 @@ h1 { margin: 0; font-size: 1.15rem; }
 .warn { color: #c0392b; }
 @media (prefers-color-scheme: dark) { .warn { color: #ff8a75; } }
 body.dragover #app { outline: 3px dashed color-mix(in srgb, currentColor 40%, transparent); outline-offset: -6px; }
-#viewer-section { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .viewer-head { display: flex; align-items: center; gap: 1rem; flex: 0 0 auto; }
-.viewer-head h2 { margin: .2rem 0; font-size: .95rem; }
 #viewer-empty { margin: .3rem 0; opacity: .65; font-size: .9rem; }
 #viewer-frame { flex: 1 1 auto; min-height: 0; width: 100%; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 8px; background: transparent; }
