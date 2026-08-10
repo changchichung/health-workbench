@@ -61,12 +61,33 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
       state = "idle";
       return { state, rejected: "unknown_format", formats: registry.formats() };
     }
-    pending = { adapter, source, path: filePath };
+    // 健保檔：歸戶確認整合進本面板（按「開始匯入」即確認，不另彈對話框；
+    // 2026-08-10 使用者走查回饋）。歸戶不符防護仍由引擎層把關。
+    let profileNote = "";
+    let assumeProfile = false;
+    if (adapter.id === "nhi_json" || adapter.id === "nhi_xml") {
+      const headText = new TextDecoder("utf-8", { fatal: false }).decode(header);
+      const m = headText.match(/"b1\.1"\s*:\s*"([^"]*)"/) || headText.match(/<b1\.1>([^<]*)<\/b1\.1>/);
+      const maskedId = m?.[1]?.trim() || null;
+      const [existing] = await getDriver().select(
+        "SELECT masked_id FROM profiles ORDER BY id LIMIT 1");
+      if (maskedId && !existing) {
+        profileNote = `<p>首次匯入：將以遮罩身分證 <strong>${escapeHtml(maskedId)}</strong> 建立本人資料。</p>`;
+        assumeProfile = true;
+      } else if (maskedId && existing && !existing.masked_id) {
+        profileNote = `<p>將把遮罩身分證 <strong>${escapeHtml(maskedId)}</strong> 綁定至既有資料。</p>`;
+      } else if (maskedId && existing?.masked_id && existing.masked_id !== maskedId) {
+        profileNote = `<p class="warn">注意：檔案遮罩身分證 ${escapeHtml(maskedId)} 與既有資料`
+          + `（${escapeHtml(existing.masked_id)}）不符，匯入將被阻擋。</p>`;
+      }
+    }
+    pending = { adapter, source, path: filePath, assumeProfile };
     state = "confirming";
     say("");
     confirmBox.innerHTML = `
       <p>判型結果：<strong>${escapeHtml(adapter.formatDesc)}</strong></p>
       <p>檔案：${escapeHtml(source.name)}（${(source.size / 1048576).toFixed(1)}MB）</p>
+      ${profileNote}
       <button id="import-go" type="button">開始匯入</button>
       <button id="import-cancel" type="button">取消</button>`;
     show(confirmBox);
@@ -87,8 +108,9 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
     const progress = (processed, totalBytes, readBytes) => {
       window.__MHB_PROGRESS_EVENTS__ = (window.__MHB_PROGRESS_EVENTS__ || 0) + 1;
       if (totalBytes > 0) bar.value = Math.min(100, (readBytes / totalBytes) * 100);
-      progressText.textContent =
-        `已處理 ${processed.toLocaleString()} 筆（${Math.round(bar.value)}%）`;
+      progressText.textContent = processed === 0
+        ? `正在檢查檔案（計算指紋）…（${Math.round(bar.value)}%）`
+        : `已處理 ${processed.toLocaleString()} 筆（${Math.round(bar.value)}%）`;
     };
     let result;
     try {
@@ -98,8 +120,10 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
         : source;
       result = await adapter.importSource(src, getDriver(), progress, {
         labEntries,
-        // dev spike 無頭驅動用旗標（隨 spike.js 一併移除；正式路徑恆走對話框）
-        assumeProfile: window.__MHB_TEST_ASSUME_PROFILE__ === true,
+        // 面板已揭露歸戶資訊並經「開始匯入」確認；peek 失敗時退原生對話框。
+        // __MHB_TEST_ASSUME_PROFILE__＝dev spike 無頭旗標（隨 spike.js 移除）
+        assumeProfile: pending.assumeProfile
+          || window.__MHB_TEST_ASSUME_PROFILE__ === true,
         confirmNewProfile: async (maskedId) => {
           const ask = window.__TAURI__.dialog.ask || window.__TAURI__.dialog.default?.ask;
           return ask(`首次匯入：以遮罩身分證 ${maskedId} 建立本人資料？`,

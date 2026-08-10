@@ -119,9 +119,16 @@ export const appleHealthAdapter = {
       throw new Error("非 Apple Health 匯出檔");
     }
 
-    // 檔案指紋：串流計算（zip 時對解壓後 XML 內容，語意同 Python）
+    // 檔案指紋：串流計算（zip 時對解壓後 XML 內容，語意同 Python）。
+    // 此階段也回報進度（processed=0 表示指紋階段），大檔（百 MB 量級 約數秒）
+    // 才不會呈現無說明的等待（2026-08-10 使用者走查回饋）
     const hasher = new Sha256();
-    for await (const chunk of await makeStream()) hasher.update(chunk);
+    let hashedBytes = 0;
+    for await (const chunk of await makeStream()) {
+      hasher.update(chunk);
+      hashedBytes += chunk.length;
+      progress?.(0, source.size, hashedBytes);
+    }
     const sha256 = hasher.hex();
 
     const store = new EngineStore(driver);
