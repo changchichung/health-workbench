@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { NodeDriver } from "../../src/store/node_driver.js";
 import { initSchema } from "../../src/store/schema.js";
+import { createProfile } from "../../src/engine/profiles.js";
 import { nhiJsonAdapter } from "../../src/adapters/nhi_json.js";
 import { appleHealthAdapter } from "../../src/adapters/apple_health.js";
 import { nodeFileSource } from "../helpers/node_source.mjs";
@@ -20,12 +21,15 @@ const LAB_ENTRIES = JSON.parse(
 async function buildDb(dbPath) {
   const d = new NodeDriver(dbPath);
   await initSchema(d);
+  const pid = await createProfile(d, "本人");
+  d.pid = pid;
   await nhiJsonAdapter.importSource(
     { bytes: new Uint8Array(readFileSync(`${REPO}/tests/fixtures/nhi_sample.json`)),
       name: "nhi_sample.json" },
-    d, null, { labEntries: LAB_ENTRIES, assumeProfile: true });
+    d, null, { labEntries: LAB_ENTRIES, profileId: pid });
   await appleHealthAdapter.importSource(
-    await nodeFileSource(`${REPO}/tests/fixtures/apple_sample.xml`), d, null, {});
+    await nodeFileSource(`${REPO}/tests/fixtures/apple_sample.xml`), d, null,
+    { profileId: pid });
   return d;
 }
 
@@ -50,7 +54,7 @@ test("provider 同構：JS payload 與 Python build_payload 數值全等", async
   const tmp = mkdtempSync(path.join(tmpdir(), "mhb-prov-"));
   const dbPath = path.join(tmp, "db.sqlite");
   const d = await buildDb(dbPath);
-  const js = await buildPayload(d, {
+  const js = await buildPayload(d, { profileId: d.pid,
     knowledgeEntries: LAB_ENTRIES, drugCachePath: null, today: "2026-08-09" });
   await d.close();
   assert.deepEqual(validateShape(js), []);
@@ -62,7 +66,7 @@ test("匯出同構：assemble 輸出的嵌入資料與 mhb rebuild 產出全等"
   const tmp = mkdtempSync(path.join(tmpdir(), "mhb-exp-"));
   const dbPath = path.join(tmp, "db.sqlite");
   const d = await buildDb(dbPath);
-  const js = await buildPayload(d, {
+  const js = await buildPayload(d, { profileId: d.pid,
     knowledgeEntries: LAB_ENTRIES, drugCachePath: null, today: "2026-08-09" });
   await d.close();
 

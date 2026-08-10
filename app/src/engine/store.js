@@ -14,19 +14,22 @@ export class EngineStore {
     this.lastInsertId = null;
   }
 
-  async getFirstProfile() {
-    const rows = await this.driver.select("SELECT * FROM profiles ORDER BY id LIMIT 1");
-    return rows[0] ?? null;
-  }
-
+  // sha256 為全庫 UNIQUE：命中時 JOIN profiles 一次帶回原歸屬成員
+  // （跨成員重複檔訊息用，design D2），未命中時 origin 兩欄為 null。
   async registerSource(profileId, filename, sha256, adapter, adapterVersion) {
     const rows = await this.driver.select(
-      "SELECT id, imported_at FROM source_documents WHERE sha256=?", [sha256]);
-    if (rows.length) return { docId: rows[0].id, importedAt: rows[0].imported_at };
+      "SELECT d.id, d.imported_at, d.profile_id, p.display_name"
+      + " FROM source_documents d JOIN profiles p ON d.profile_id = p.id"
+      + " WHERE d.sha256=?", [sha256]);
+    if (rows.length) {
+      return { docId: rows[0].id, importedAt: rows[0].imported_at,
+        originProfileId: rows[0].profile_id, originDisplayName: rows[0].display_name };
+    }
     const r = await this.driver.execute(
       "INSERT INTO source_documents(profile_id,filename,sha256,adapter,adapter_version)"
       + " VALUES(?,?,?,?,?)", [profileId, filename, sha256, adapter, adapterVersion]);
-    return { docId: r.lastInsertRowid, importedAt: null };
+    return { docId: r.lastInsertRowid, importedAt: null,
+      originProfileId: null, originDisplayName: null };
   }
 
   async finalizeImport(docId) {

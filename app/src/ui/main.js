@@ -1,44 +1,96 @@
 // App 前端入口。Tauri API 走 withGlobalTauri（window.__TAURI__），
 // 引擎模組（engine/、adapters/、store/）維持純 ESM，Node 測試可直接 import。
+// 多成員（change multi-profile-management）：currentProfileId 為單一
+// 事實來源，檢視相關介面（狀態列/檢視頁）跟當前成員，匯入紀錄卡全庫。
 import { TauriDriver } from "../store/tauri_driver.js";
 import { initSchema, SCHEMA_VERSION } from "../store/schema.js";
 import { resolveDbPath, importExistingDb } from "../store/location.js";
+import { loadSettings, saveSettings, resolveCurrentProfile } from "../store/settings.js";
+import { listProfiles } from "../engine/profiles.js";
 import { createImportFlow } from "./import_flow.js";
 import { createViewer } from "./viewer.js";
 import { createHistory } from "./history.js";
+import { createProfileManager } from "./profile_manager.js";
 
 const statusEl = document.getElementById("status");
-const app = { driver: null, dbPath: null, flow: null, viewer: null, history: null };
+const app = { driver: null, dbPath: null, dbDir: null, currentProfileId: null,
+  flow: null, viewer: null, history: null, manager: null };
 
-async function tableCounts(driver) {
+const esc = (s) => String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;");
+
+async function tableCounts(driver, profileId) {
   const tables = ["encounters", "medications", "lab_results", "apple_records"];
   const out = {};
   for (const t of tables) {
-    const [{ c }] = await driver.select(`SELECT count(*) c FROM ${t}`);
+    const [{ c }] = profileId == null
+      ? [{ c: 0 }]
+      : await driver.select(
+        `SELECT count(*) c FROM ${t} WHERE profile_id=?`, [profileId]);
     out[t] = c;
   }
   return out;
 }
 
+// 狀態列＝當前成員視角（design D3）
 async function refreshStatus() {
-  const counts = await tableCounts(app.driver);
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  statusEl.textContent = total === 0
-    ? "尚無資料。請匯入健保存摺或 Apple 健康匯出檔。"
-    : `就醫 ${counts.encounters}、用藥 ${counts.medications}、檢驗 ${counts.lab_results}、Apple ${counts.apple_records.toLocaleString()}`;
+  const profiles = await listProfiles(app.driver);
+  const current = profiles.find(p => p.id === app.currentProfileId) ?? null;
+  if (!current) {
+    statusEl.textContent = "尚無成員。請匯入健保存摺或 Apple 健康匯出檔（匯入時建立成員）。";
+  } else {
+    const counts = await tableCounts(app.driver, current.id);
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    statusEl.textContent = total === 0
+      ? `成員「${current.display_name}」尚無資料。請匯入健保存摺或 Apple 健康匯出檔。`
+      : `成員「${current.display_name}」：就醫 ${counts.encounters}、用藥 ${counts.medications}、`
+        + `檢驗 ${counts.lab_results}、Apple ${counts.apple_records.toLocaleString()}`;
+  }
   await app.history?.refresh().catch(() => {});
-  return counts;
+}
+
+// 成員切換器（app-viewer spec：全域切換器＋管理入口）
+async function refreshSwitcher() {
+  const select = document.getElementById("profile-select");
+  const profiles = await listProfiles(app.driver);
+  if (profiles.length === 0) {
+    select.innerHTML = `<option value="">尚無成員</option>`;
+    select.disabled = true;
+    return profiles;
+  }
+  select.disabled = false;
+  select.innerHTML = profiles.map(p =>
+    `<option value="${p.id}">${esc(p.display_name)}</option>`).join("");
+  select.value = String(app.currentProfileId ?? "");
+  return profiles;
+}
+
+// 切換／成員異動後的統一收斂點：驗證 currentProfileId、存 settings、
+// 刷新切換器＋狀態列＋檢視頁（匯入紀錄卡在 refreshStatus 內連帶刷新）
+async function setCurrentProfile(id, { save = true } = {}) {
+  const profiles = await listProfiles(app.driver);
+  app.currentProfileId = resolveCurrentProfile(
+    { current_profile_id: id }, profiles);
+  if (save && app.currentProfileId != null) {
+    await saveSettings(app.dbDir,
+      { current_profile_id: app.currentProfileId }).catch(() => {});
+  }
+  await refreshSwitcher();
+  await refreshStatus();
+  await app.viewer?.refresh().catch(() => {});
 }
 
 async function boot() {
   const { path, overridden } = await resolveDbPath();
   app.dbPath = path;
-  const dir = path.replace(/[/\\][^/\\]+$/, "");
-  await window.__TAURI__.fs.mkdir(dir, { recursive: true }).catch(() => {});
+  app.dbDir = path.replace(/[/\\][^/\\]+$/, "");
+  await window.__TAURI__.fs.mkdir(app.dbDir, { recursive: true }).catch(() => {});
   app.driver = await TauriDriver.open(path);
   await initSchema(app.driver);
-  const counts = await refreshStatus();
-  return { path, overridden, counts };
+  const profiles = await listProfiles(app.driver);
+  app.currentProfileId = resolveCurrentProfile(
+    await loadSettings(app.dbDir), profiles);
+  return { path, overridden };
 }
 
 // 「匯入既有資料庫檔」：選檔 → 驗版本 → 關主庫 → 複製 → 重開＋遷移
@@ -56,7 +108,7 @@ async function importExisting(srcPath) {
   } finally {
     app.driver = await TauriDriver.open(app.dbPath);
     await initSchema(app.driver);
-    if (app.flow) await refreshStatus().catch(() => {});
+    if (app.flow) await setCurrentProfile(app.currentProfileId).catch(() => {});
   }
 }
 
@@ -85,19 +137,26 @@ async function wireUi() {
   app.viewer = createViewer({
     getDriver: () => app.driver,
     getDbPath: () => app.dbPath,
+    getProfileId: () => app.currentProfileId,
     labEntries,
   });
   app.history = createHistory({
     getDriver: () => app.driver,
     getDbPath: () => app.dbPath,
   });
-  await app.history.refresh();
+  app.manager = createProfileManager({
+    getDriver: () => app.driver,
+    getCurrentProfileId: () => app.currentProfileId,
+    // 成員異動（新增/改名/刪除）→ 重新驗證當前成員並全面刷新
+    onChanged: async () => setCurrentProfile(app.currentProfileId),
+  });
   app.flow = createImportFlow({
     getDriver: () => app.driver,
     labEntries,
+    // 匯入面板就地新增成員 → 切換器同步
+    onProfilesChanged: async () => { await refreshSwitcher(); },
     onImported: async () => {
-      await refreshStatus();
-      await app.viewer.refresh();
+      await setCurrentProfile(app.currentProfileId);
       const report = document.getElementById("import-report");
       if (report && !report.querySelector("#goto-viewer-btn")) {
         const btn = document.createElement("button");
@@ -109,10 +168,18 @@ async function wireUi() {
       }
     },
   });
+  document.getElementById("profile-select").addEventListener("change", async (e) => {
+    await setCurrentProfile(Number(e.target.value));
+  });
+  document.getElementById("manage-profiles-btn").addEventListener("click",
+    () => app.manager.open());
   document.getElementById("export-html-btn").addEventListener("click", async () => {
     const r = await app.viewer.exportHtml();
     if (r.ok) statusEl.textContent = `已匯出：${r.path}（${(r.bytes / 1024).toFixed(0)}KB，含全部個資請妥善保管）`;
   });
+
+  await refreshSwitcher();
+  await refreshStatus();
   const { rendered } = await app.viewer.refresh();
   setTab(rendered ? "viewer" : "import");
 

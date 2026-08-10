@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { NodeDriver } from "../../src/store/node_driver.js";
 import { initSchema } from "../../src/store/schema.js";
+import { createProfile } from "../../src/engine/profiles.js";
 import { nhiJsonAdapter } from "../../src/adapters/nhi_json.js";
 import { createRegistry } from "../../src/adapters/registry.js";
 import { nhiXmlAdapter } from "../../src/adapters/nhi_xml.js";
@@ -31,7 +32,7 @@ test("截斷的健保 JSON：引擎丟錯且零寫入；GUI 轉譯為友善訊�
   try {
     await nhiJsonAdapter.importSource(
       { bytes: new Uint8Array(truncated), name: "截斷.json" }, d, null,
-      { labEntries: [], assumeProfile: true });
+      { labEntries: [], profileId: await createProfile(d, "本人") });
   } catch (e) {
     thrown = e;
   }
@@ -52,7 +53,7 @@ test("垃圾內容偽裝 myhealthbank：友善訊息不外洩內部結構詞", a
   try {
     await nhiJsonAdapter.importSource(
       { bytes: junk, name: "junk.json" }, d, null,
-      { labEntries: [], assumeProfile: true });
+      { labEntries: [], profileId: await createProfile(d, "本人") });
   } catch (e) {
     thrown = e;
   }

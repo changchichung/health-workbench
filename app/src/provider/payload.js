@@ -3,6 +3,7 @@
 // 量測型日中位數、品質旗標排除）。差分驗收：tests/provider/ 對同一庫
 // 比對 Python build_payload 輸出數值全等（generated_at 除外）。
 import { attachDrugs } from "../knowledge/drugs.js";
+import { requireProfile } from "../engine/profiles.js";
 
 const TREND_EXCLUDE = "quality_flags NOT LIKE '%epoch_placeholder_date%'"
   + " AND quality_flags NOT LIKE '%out_of_range%'";
@@ -27,22 +28,22 @@ export function pyRound(v, digits) {
   return r / f;
 }
 
-async function dailyCountingSeries(driver, typeZh) {
+async function dailyCountingSeries(driver, typeZh, profileId) {
   const rows = await driver.select(`
     WITH daily AS (
       SELECT substr(start_ts,1,10) d, source_name, SUM(COALESCE(value_normalized, value_numeric)) v
-      FROM apple_records WHERE type_zh=? AND ${TREND_EXCLUDE}
+      FROM apple_records WHERE profile_id=? AND type_zh=? AND ${TREND_EXCLUDE}
       GROUP BY d, source_name)
-    SELECT d, MAX(v) v FROM daily GROUP BY d ORDER BY d`, [typeZh]);
+    SELECT d, MAX(v) v FROM daily GROUP BY d ORDER BY d`, [profileId, typeZh]);
   return rows.filter(r => r.v !== null).map(r => [r.d, pyRound(r.v, 1)]);
 }
 
-async function dailyMeasureSeries(driver, typeZh) {
+async function dailyMeasureSeries(driver, typeZh, profileId) {
   const rows = await driver.select(`
     SELECT substr(start_ts,1,10) d, COALESCE(value_normalized, value_numeric) v
-    FROM apple_records WHERE type_zh=? AND ${TREND_EXCLUDE} AND
+    FROM apple_records WHERE profile_id=? AND type_zh=? AND ${TREND_EXCLUDE} AND
     COALESCE(value_normalized, value_numeric) IS NOT NULL
-    ORDER BY d`, [typeZh]);
+    ORDER BY d`, [profileId, typeZh]);
   const buckets = new Map();
   for (const { d, v } of rows) {
     if (!buckets.has(d)) buckets.set(d, []);
@@ -55,13 +56,17 @@ async function dailyMeasureSeries(driver, typeZh) {
 }
 
 // knowledgeEntries: labs.json 條目；drugCachePath: drug_items.sqlite 路徑（可 null）
-export async function buildPayload(driver, { knowledgeEntries, drugCachePath, today }) {
+// profileId 必填（app-viewer spec：provider 僅回傳該成員資料）
+export async function buildPayload(driver, { profileId, knowledgeEntries,
+  drugCachePath, today }) {
+  const profileRow = await requireProfile(driver, profileId);
   const encounters = (await driver.select(`
     SELECT e.id, e.type, e.date, e.facility_name, e.dx_code, e.dx_name,
            e.copay, e.nhi_points, e.section, e.source_index, e.quality_flags,
            d.filename AS source_file
     FROM encounters e JOIN source_documents d ON e.doc_id = d.id
-    ORDER BY e.date DESC, e.id DESC`)).map(r => ({ ...r }));
+    WHERE e.profile_id=?
+    ORDER BY e.date DESC, e.id DESC`, [profileId])).map(r => ({ ...r }));
 
   const medsByEnc = {};
   const medications = [];
@@ -71,7 +76,8 @@ export async function buildPayload(driver, { knowledgeEntries, drugCachePath, to
            m.days_supply, m.tooth_name, m.section AS section_hint,
            e.date, e.facility_name
     FROM medications m JOIN encounters e ON m.encounter_id = e.id
-    ORDER BY e.date DESC`)) {
+    WHERE m.profile_id=?
+    ORDER BY e.date DESC`, [profileId])) {
     const m = { ...row };
     const drug = drugs ? await drugs.lookup(m.order_code) : null;
     if (drug) {
@@ -90,16 +96,20 @@ export async function buildPayload(driver, { knowledgeEntries, drugCachePath, to
            test_name_raw, test_name_normalized IS NULL AS unmapped,
            test_date, value_text, value_numeric, ref_range, facility_name,
            order_name, quality_flags
-    FROM lab_results ORDER BY test_date`)).map(r => ({ ...r }));
+    FROM lab_results WHERE profile_id=? ORDER BY test_date`, [profileId]))
+    .map(r => ({ ...r }));
   const reports = (await driver.select(`
     SELECT id, visit_date, test_date, facility_name, order_name, report_text
-    FROM reports ORDER BY test_date DESC`)).map(r => ({ ...r }));
+    FROM reports WHERE profile_id=? ORDER BY test_date DESC`, [profileId]))
+    .map(r => ({ ...r }));
   const immunizations = (await driver.select(
-    "SELECT date, vaccine_name, facility_name FROM immunizations ORDER BY date DESC"))
+    "SELECT date, vaccine_name, facility_name FROM immunizations"
+    + " WHERE profile_id=? ORDER BY date DESC", [profileId]))
     .map(r => ({ ...r }));
   const nhiBody = (await driver.select(`
     SELECT check_date, height_cm, weight_kg, bmi, waist, systolic, diastolic
-    FROM body_measurements ORDER BY check_date`)).map(r => ({ ...r }));
+    FROM body_measurements WHERE profile_id=? ORDER BY check_date`, [profileId]))
+    .map(r => ({ ...r }));
 
   const knowledge = {};
   for (const e of knowledgeEntries) {
@@ -110,29 +120,41 @@ export async function buildPayload(driver, { knowledgeEntries, drugCachePath, to
   }
 
   const activity = {};
-  for (const t of COUNTING_TYPES) activity[t] = await dailyCountingSeries(driver, t);
+  for (const t of COUNTING_TYPES) {
+    activity[t] = await dailyCountingSeries(driver, t, profileId);
+  }
   const measures = {};
-  for (const t of MEASURE_TYPES) measures[t] = await dailyMeasureSeries(driver, t);
+  for (const t of MEASURE_TYPES) {
+    measures[t] = await dailyMeasureSeries(driver, t, profileId);
+  }
   const workouts = (await driver.select(`
     SELECT activity, substr(start_ts,1,10) AS date, duration_min, source_name
-    FROM apple_workouts ORDER BY start_ts DESC`)).map(r => ({ ...r }));
+    FROM apple_workouts WHERE profile_id=? ORDER BY start_ts DESC`, [profileId]))
+    .map(r => ({ ...r }));
 
-  const [range] = await driver.select("SELECT MIN(date) lo, MAX(date) hi FROM encounters");
+  const [range] = await driver.select(
+    "SELECT MIN(date) lo, MAX(date) hi FROM encounters WHERE profile_id=?",
+    [profileId]);
+  // counts 各表過濾至當前成員；唯 profiles 一欄維持全庫成員數（design D3）
   const counts = {};
   for (const t of TABLES) {
-    const [{ c }] = await driver.select(`SELECT COUNT(*) c FROM ${t}`);
+    const [{ c }] = t === "profiles"
+      ? await driver.select("SELECT COUNT(*) c FROM profiles")
+      : await driver.select(
+        `SELECT COUNT(*) c FROM ${t} WHERE profile_id=?`, [profileId]);
     counts[t] = c;
   }
-  const [profile] = await driver.select("SELECT display_name FROM profiles LIMIT 1");
+  // sources 僅當前成員的來源檔案（HTML 匯出不得夾帶他人檔名）
   const sources = (await driver.select(
     "SELECT filename, adapter, imported_at, import_stats"
-    + " FROM source_documents ORDER BY imported_at")).map(r => ({ ...r }));
+    + " FROM source_documents WHERE profile_id=? ORDER BY imported_at",
+    [profileId])).map(r => ({ ...r }));
 
   return {
     meta: {
       generated_at: today,
       date_min: range.lo, date_max: range.hi,
-      profile: profile?.display_name ?? null,
+      profile: profileRow.display_name,
       counts,
       sources,
       drug_cache: drugCacheMeta,

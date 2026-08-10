@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { NodeDriver } from "../../src/store/node_driver.js";
 import { initSchema } from "../../src/store/schema.js";
+import { createProfile } from "../../src/engine/profiles.js";
 import { appleHealthAdapter } from "../../src/adapters/apple_health.js";
 
 // 回歸：chunk 邊界切在「<Record」標籤名中間時，紀錄不得被丟棄。
@@ -33,8 +34,9 @@ test("chunk 切在 <Record 標籤名中間：三筆全數入庫", async () => {
   for (let off = 1; off <= 7; off++) {
     const d = new NodeDriver();
     await initSchema(d);
+    const pid = await createProfile(d, "本人");
     const r = await appleHealthAdapter.importSource(
-      sourceWithSplit(XML, secondRecord + off), d, null, {});
+      sourceWithSplit(XML, secondRecord + off), d, null, { profileId: pid });
     assert.equal(r.report.sections.apple_records.records, 3,
       `切點 +${off}：掃描筆數`);
     const [{ c }] = await d.select("SELECT count(*) c FROM apple_records");
@@ -47,7 +49,8 @@ test("chunk 切在屬性值中間：紀錄完整（殘尾接續原有覆蓋）",
   const mid = XML.indexOf('value="200"') + 3;
   const d = new NodeDriver();
   await initSchema(d);
-  await appleHealthAdapter.importSource(sourceWithSplit(XML, mid), d, null, {});
+  await appleHealthAdapter.importSource(sourceWithSplit(XML, mid), d, null,
+    { profileId: await createProfile(d, "本人") });
   const rows = await d.select(
     "SELECT value_numeric v FROM apple_records ORDER BY start_ts");
   assert.deepEqual(rows.map(r => r.v), [100, 200, 300]);

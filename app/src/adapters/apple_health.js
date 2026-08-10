@@ -2,6 +2,7 @@
 // 行為受既有 openspec/specs/apple-health-import spec 約束）。
 // 串流解析、內容判型、來源別單位正規化、品質旗標、檔內去重（自然鍵）。
 import { EngineStore } from "../engine/store.js";
+import { requireProfile } from "../engine/profiles.js";
 import { pyFloat } from "../engine/values.js";
 import { Sha256 } from "../engine/sha256.js";
 import { buildIncremental } from "../engine/quality_report.js";
@@ -104,6 +105,8 @@ export const appleHealthAdapter = {
   // source: ByteSource（zip 檔或 XML 檔；資料夾由 GUI/測試層先解析成 XML 檔）
   async importSource(source, driver, progress, opts = {}) {
     const messages = [];
+    // 歸屬驗證放最前：指紋計算是大檔昂貴步驟，缺 profileId 不該白算
+    const profile = await requireProfile(driver, opts.profileId);
     // 解出 XML 串流工廠與顯示名（zip → 成員；否則整檔即 XML）
     const header = await source.readAt(0, Math.min(65536, source.size));
     let displayName = source.name;
@@ -133,17 +136,15 @@ export const appleHealthAdapter = {
 
     const store = new EngineStore(driver);
     return driver.transaction(async () => {
-      let profile = await store.getFirstProfile();
-      if (!profile) {
-        await driver.execute("INSERT INTO profiles(display_name) VALUES ('本人')");
-        profile = await store.getFirstProfile();
-      }
+      // Apple 檔無身分識別：直接歸入所選成員（歸屬正確性由 GUI 面板
+      // 人眼確認，app-import-engine spec「匯入歸屬指定」）
       const pid = profile.id;
-      const { docId, importedAt } = await store.registerSource(
+      const { docId, importedAt, originDisplayName } = await store.registerSource(
         pid, displayName, sha256, "apple_health", ADAPTER_VERSION);
       if (importedAt) {
-        messages.push(`此檔案已於 ${importedAt} 匯入過（SHA-256 相同），跳過。`);
-        return { status: "skipped_duplicate", importedAt, messages };
+        messages.push(`此檔案已於 ${importedAt} 匯入至成員`
+          + `「${originDisplayName}」（SHA-256 相同），跳過。`);
+        return { status: "skipped_duplicate", importedAt, originDisplayName, messages };
       }
 
       // 第二遍串流：解析＋批次入庫

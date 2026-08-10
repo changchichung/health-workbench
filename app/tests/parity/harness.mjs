@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { NodeDriver } from "../../src/store/node_driver.js";
 import { initSchema } from "../../src/store/schema.js";
+import { createProfile } from "../../src/engine/profiles.js";
 import { nhiJsonAdapter } from "../../src/adapters/nhi_json.js";
 import { nhiXmlAdapter } from "../../src/adapters/nhi_xml.js";
 import { appleHealthAdapter } from "../../src/adapters/apple_health.js";
@@ -50,6 +51,9 @@ export function runPythonImports(files, dbPath) {
 export async function runJsImports(files, dbPath) {
   const driver = new NodeDriver(dbPath);
   await initSchema(driver);
+  // 歸屬指定（design D6）：前置建立「本人」，健保匯入時綁定 b1.1，
+  // 終態 profiles 列與 Python oracle 自動建檔結果全等
+  const pid = await createProfile(driver, "本人");
   const reports = [];
   for (const f of files) {
     const src = await nodeFileSource(f);
@@ -58,13 +62,13 @@ export async function runJsImports(files, dbPath) {
     if (nhiJsonAdapter.detect(header, src.name)) {
       result = await nhiJsonAdapter.importSource(
         { bytes: new Uint8Array(readFileSync(f)), name: src.name },
-        driver, null, { labEntries: LAB_ENTRIES, assumeProfile: true });
+        driver, null, { labEntries: LAB_ENTRIES, profileId: pid });
     } else if (nhiXmlAdapter.detect(header, src.name)) {
       result = await nhiXmlAdapter.importSource(
         { bytes: new Uint8Array(readFileSync(f)), name: src.name },
-        driver, null, { labEntries: LAB_ENTRIES, assumeProfile: true });
+        driver, null, { labEntries: LAB_ENTRIES, profileId: pid });
     } else if (appleHealthAdapter.detect(header, src.name)) {
-      result = await appleHealthAdapter.importSource(src, driver, null, {});
+      result = await appleHealthAdapter.importSource(src, driver, null, { profileId: pid });
     } else {
       throw new Error(`無法判型：${f}`);
     }

@@ -10,12 +10,18 @@
   <main id="app">
     <header class="topbar">
       <h1>健康資料工作台</h1>
+      <div class="profile-switch">
+        <label for="profile-select" class="ps-label">成員</label>
+        <select id="profile-select" title="切換檢視成員"></select>
+        <button id="manage-profiles-btn" type="button" class="btn">管理成員…</button>
+      </div>
       <nav class="tabs" role="tablist">
         <button id="tab-btn-import" type="button" role="tab">匯入資料</button>
         <button id="tab-btn-viewer" type="button" role="tab">資料檢視</button>
       </nav>
     </header>
     <p id="status">App 殼啟動中…</p>
+    <section id="profile-manager" hidden></section>
 
     <section id="tab-import" class="tab-panel" hidden>
       <div id="dropzone" role="button" tabindex="0">

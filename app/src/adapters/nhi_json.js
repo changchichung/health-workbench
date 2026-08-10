@@ -3,6 +3,7 @@
 // 與 Python 版刻意不同處僅一項：判型純看內容不看副檔名（app-import-engine spec）。
 import * as fm from "./nhi_fieldmap.js";
 import { EngineStore } from "../engine/store.js";
+import { requireProfile } from "../engine/profiles.js";
 import { toNum, normDate } from "../engine/values.js";
 import { pyJsonDumps, sha256Hex } from "../engine/fingerprint.js";
 import { buildIncremental } from "../engine/quality_report.js";
@@ -59,54 +60,51 @@ export const nhiJsonAdapter = {
 
 // JSON/XML 共用的匯入核心：bdata 形狀＝JSON 版 myhealthbank.bdata。
 // meta: { name, sha256, adapter, formatVariant? }
-// opts: { labEntries, assumeProfile?, confirmNewProfile?: async (maskedId)=>bool }
+// opts: { labEntries, profileId }（profileId 必填：匯入歸屬指定，
+// app-import-engine spec；缺省或失效即錯，NEVER 回退第一個成員）
 // 回傳 { status: "ok"|"aborted"|"skipped_duplicate", messages, report? }
 export async function importNhiBdata(bdata, meta, driver, progress, opts = {}) {
   const messages = [];
   const sha256 = meta.sha256;
   const maskedId = (bdata["b1.1"] || "").trim();
   const store = new EngineStore(driver);
+  const profile = await requireProfile(driver, opts.profileId);
 
   return driver.transaction(async () => {
-      // 遮罩身分證歸戶防護（語意同 Python：綁定一致／缺 b1.1 中止／首匯認領）
-      const existing = await store.getFirstProfile();
-      let pid;
-      if (existing) {
-        pid = existing.id;
-        if (!maskedId) {
-          messages.push("匯入中止：檔案缺少遮罩身分證（b1.1），無法確認歸戶。");
+      // 遮罩身分證護欄（對所選成員）：缺 b1.1 中止／已綁定必須相符／
+      // 未綁定先查身分證未屬他人再綁定（選錯成員防護）
+      const pid = profile.id;
+      if (!maskedId) {
+        messages.push("匯入中止：檔案缺少遮罩身分證（b1.1），無法確認歸戶。");
+        throw new AbortImport(messages);
+      }
+      if (profile.masked_id) {
+        if (profile.masked_id !== maskedId) {
+          messages.push(`匯入中止：檔案遮罩身分證 ${maskedId} 與成員`
+            + `「${profile.display_name}」已綁定的 ${profile.masked_id} 不符。`
+            + "資料庫未寫入任何資料。");
           throw new AbortImport(messages);
         }
-        if (existing.masked_id) {
-          if (existing.masked_id !== maskedId) {
-            messages.push(`匯入中止：檔案遮罩身分證 ${maskedId} 與資料庫既有 profile`
-              + `（${existing.masked_id}）不符。資料庫未寫入任何資料。`);
-            throw new AbortImport(messages);
-          }
-        } else {
-          await driver.execute("UPDATE profiles SET masked_id=? WHERE id=?", [maskedId, pid]);
-          messages.push(`已將遮罩身分證 ${maskedId} 綁定至既有 profile。`);
-        }
       } else {
-        if (!opts.assumeProfile) {
-          const ok = opts.confirmNewProfile
-            ? await opts.confirmNewProfile(maskedId) : false;
-          if (!ok) {
-            messages.push("匯入中止：使用者未確認建立 profile。");
-            throw new AbortImport(messages);
-          }
+        const [taken] = await driver.select(
+          "SELECT display_name FROM profiles WHERE masked_id=? AND id!=?",
+          [maskedId, pid]);
+        if (taken) {
+          messages.push(`匯入中止：檔案遮罩身分證 ${maskedId} 已屬於成員`
+            + `「${taken.display_name}」，請改選該成員後重新匯入。`
+            + "資料庫未寫入任何資料。");
+          throw new AbortImport(messages);
         }
-        await driver.execute(
-          "INSERT INTO profiles(display_name, masked_id) VALUES(?,?)", ["本人", maskedId]);
-        const first = await store.getFirstProfile();
-        pid = first.id;
+        await driver.execute("UPDATE profiles SET masked_id=? WHERE id=?", [maskedId, pid]);
+        messages.push(`已將遮罩身分證 ${maskedId} 綁定至成員「${profile.display_name}」。`);
       }
 
-      const { docId, importedAt } = await store.registerSource(
+      const { docId, importedAt, originDisplayName } = await store.registerSource(
         pid, meta.name, sha256, meta.adapter, ADAPTER_VERSION);
       if (importedAt) {
-        messages.push(`此檔案已於 ${importedAt} 匯入過（SHA-256 相同），跳過。`);
-        return { status: "skipped_duplicate", importedAt, messages };
+        messages.push(`此檔案已於 ${importedAt} 匯入至成員`
+          + `「${originDisplayName}」（SHA-256 相同），跳過。`);
+        return { status: "skipped_duplicate", importedAt, originDisplayName, messages };
       }
 
       const sections = {};

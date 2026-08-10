@@ -109,3 +109,49 @@ body.dragover #app { outline: 3px dashed var(--accent); outline-offset: -6px; bo
   padding: 4px 12px 4px 0; font-size: 13px; text-align: left;
 }
 #import-history th { color: var(--ink2); font-weight: 600; font-size: 12px; }
+
+/* ===== 多成員（multi-profile-management） ===== */
+.profile-switch { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.profile-switch .ps-label { color: var(--ink2); font-size: 13px; }
+#profile-select {
+  font: 600 14px -apple-system, "PingFang TC", sans-serif;
+  min-height: 34px; padding: 4px 10px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--card); color: var(--ink);
+}
+.attribution {
+  margin: 10px 0; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--bg);
+}
+.attribution label { color: var(--ink2); margin-right: 6px; }
+#import-profile-select {
+  font: inherit; min-height: 34px; padding: 4px 10px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); color: var(--ink);
+}
+.attribution-chip { font-size: 16px; margin: 8px 0 0; }
+#import-new-member { margin-top: 8px; display: flex; gap: 8px; }
+#import-new-member input, .pm-add input, #pm-inline input {
+  font: inherit; padding: 6px 10px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--card); color: var(--ink); min-width: 200px;
+}
+#profile-manager {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 48px 16px; z-index: 30; overflow: auto;
+}
+.pm-card {
+  background: var(--card); border-radius: 16px; box-shadow: var(--shadow);
+  padding: 18px 20px; max-width: 640px; width: 100%;
+}
+.pm-card table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+.pm-card th, .pm-card td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.pm-add { display: flex; gap: 8px; margin-top: 10px; }
+.pm-foot { margin-top: 12px; text-align: right; }
+#pm-inline { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+button.danger {
+  font: 600 14px -apple-system, "PingFang TC", sans-serif;
+  min-height: 34px; padding: 6px 14px; border: none; border-radius: 10px;
+  background: var(--warn); color: #fff; cursor: pointer;
+}
+button.danger:disabled { opacity: 0.4; cursor: not-allowed; }
+h4.profile-group { margin: 14px 0 4px; font-size: 14px; color: var(--ink2); }

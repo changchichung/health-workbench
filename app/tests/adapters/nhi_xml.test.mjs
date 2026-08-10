@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { NodeDriver } from "../../src/store/node_driver.js";
 import { initSchema } from "../../src/store/schema.js";
+import { createProfile } from "../../src/engine/profiles.js";
 import { nhiXmlAdapter, xmlToBdata } from "../../src/adapters/nhi_xml.js";
 import { nhiJsonAdapter } from "../../src/adapters/nhi_json.js";
 import { createRegistry } from "../../src/adapters/registry.js";
@@ -57,6 +58,7 @@ function jsonToXml(data) {
 async function freshDriver() {
   const d = new NodeDriver();
   await initSchema(d);
+  d.pid = await createProfile(d, "本人"); // opts.profileId 必填（歸屬指定）
   return d;
 }
 
@@ -98,14 +100,14 @@ test("同批 JSON/XML 交叉對帳：共同節區全等，差異僅 r8 報告換
   const dj = await freshDriver();
   await nhiJsonAdapter.importSource(
     { bytes: new Uint8Array(readFileSync(JSON_FIXTURE)), name: "same.json" },
-    dj, null, { labEntries: LAB_ENTRIES, assumeProfile: true });
+    dj, null, { labEntries: LAB_ENTRIES, profileId: dj.pid });
   const jsonDump = await dumpTables(dj);
   await dj.close();
 
   const dx = await freshDriver();
   const rx = await nhiXmlAdapter.importSource(
     { bytes: new TextEncoder().encode(xmlText), name: "same.xml" },
-    dx, null, { labEntries: LAB_ENTRIES, assumeProfile: true });
+    dx, null, { labEntries: LAB_ENTRIES, profileId: dx.pid });
   assert.equal(rx.status, "ok");
   const xmlDump = await dumpTables(dx);
   await dx.close();
@@ -137,7 +139,7 @@ test("XML 節區缺漏事實：r9-r14 標記 no_data 並註明格式", async () 
   const d = await freshDriver();
   const r = await nhiXmlAdapter.importSource(
     { bytes: new TextEncoder().encode(jsonToXml(data)), name: "t.xml" },
-    d, null, { labEntries: LAB_ENTRIES, assumeProfile: true });
+    d, null, { labEntries: LAB_ENTRIES, profileId: d.pid });
   for (const sec of ["r9", "r10", "r11", "r12", "r13", "r14"]) {
     assert.equal(r.report.sections[sec].status, "no_data", sec);
     assert.equal(r.report.sections[sec].note, "XML 格式無此節區", sec);

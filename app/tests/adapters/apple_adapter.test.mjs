@@ -8,6 +8,7 @@ import { NodeDriver } from "../../src/store/node_driver.js";
 import { initSchema } from "../../src/store/schema.js";
 import { appleHealthAdapter } from "../../src/adapters/apple_health.js";
 import { EngineStore } from "../../src/engine/store.js";
+import { createProfile } from "../../src/engine/profiles.js";
 import { nodeFileSource, resolveAppleDir } from "../helpers/node_source.mjs";
 
 const REPO = new URL("../../..", import.meta.url).pathname;
@@ -16,13 +17,14 @@ const FIXTURE = `${REPO}/tests/fixtures/apple_sample.xml`;
 async function freshDriver() {
   const d = new NodeDriver();
   await initSchema(d);
+  d.pid = await createProfile(d, "本人"); // opts.profileId 必填（歸屬指定）
   return d;
 }
 
 test("匯入 apple fixture：與 Python CLI 同檔逐表筆數一致", async () => {
   const d = await freshDriver();
   const r = await appleHealthAdapter.importSource(
-    await nodeFileSource(FIXTURE), d, null, {});
+    await nodeFileSource(FIXTURE), d, null, { profileId: d.pid });
   assert.equal(r.status, "ok");
   const js = await new EngineStore(d).tableCounts();
   await d.close();
@@ -43,7 +45,7 @@ test("匯入 apple fixture：與 Python CLI 同檔逐表筆數一致", async () 
 
 test("來源別單位規則：好轻體脂 0.255 → 25.5，原值保留＋旗標", async () => {
   const d = await freshDriver();
-  await appleHealthAdapter.importSource(await nodeFileSource(FIXTURE), d, null, {});
+  await appleHealthAdapter.importSource(await nodeFileSource(FIXTURE), d, null, { profileId: d.pid });
   const rows = await d.select(
     "SELECT value_numeric, value_normalized, quality_flags FROM apple_records"
     + " WHERE type_zh='體脂率' AND value_numeric <= 1");
@@ -58,7 +60,7 @@ test("來源別單位規則：好轻體脂 0.255 → 25.5，原值保留＋旗�
 
 test("品質旗標：epoch 佔位日期與離群值", async () => {
   const d = await freshDriver();
-  await appleHealthAdapter.importSource(await nodeFileSource(FIXTURE), d, null, {});
+  await appleHealthAdapter.importSource(await nodeFileSource(FIXTURE), d, null, { profileId: d.pid });
   const [{ c: epoch }] = await d.select(
     "SELECT count(*) c FROM apple_records WHERE quality_flags LIKE '%epoch_placeholder_date%'");
   const [{ c: outlier }] = await d.select(
@@ -71,11 +73,11 @@ test("品質旗標：epoch 佔位日期與離群值", async () => {
 test("檔內重複去除＋重複檔案跳過", async () => {
   const d = await freshDriver();
   const r1 = await appleHealthAdapter.importSource(
-    await nodeFileSource(FIXTURE), d, null, {});
+    await nodeFileSource(FIXTURE), d, null, { profileId: d.pid });
   const skipped = r1.report.dedup.skipped_dup.apple_records || 0;
   assert.ok(skipped >= 1, "fixture 含 27 筆型重複，應有檔內去重");
   const r2 = await appleHealthAdapter.importSource(
-    await nodeFileSource(FIXTURE), d, null, {});
+    await nodeFileSource(FIXTURE), d, null, { profileId: d.pid });
   assert.equal(r2.status, "skipped_duplicate");
   await d.close();
 });
@@ -93,13 +95,13 @@ test("zip 匯入：壓縮後匯入結果與 XML 直接匯入等價（含中文�
   ].join("\n")], { encoding: "utf-8" });
 
   const dXml = await freshDriver();
-  await appleHealthAdapter.importSource(await nodeFileSource(FIXTURE), dXml, null, {});
+  await appleHealthAdapter.importSource(await nodeFileSource(FIXTURE), dXml, null, { profileId: dXml.pid });
   const xmlCounts = await new EngineStore(dXml).tableCounts();
   await dXml.close();
 
   const dZip = await freshDriver();
   const rz = await appleHealthAdapter.importSource(
-    await nodeFileSource(zipPath), dZip, null, {});
+    await nodeFileSource(zipPath), dZip, null, { profileId: dZip.pid });
   assert.equal(rz.status, "ok");
   assert.match(rz.report.source.filename, /export\.zip:apple_health_export\/輸出\.xml/);
   const zipCounts = await new EngineStore(dZip).tableCounts();

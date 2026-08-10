@@ -1,16 +1,44 @@
-// 匯入操作流程（app-import-gui spec）：判型確認 → 進度 → 報告卡/防護訊息。
-// 狀態機：idle → confirming → importing → done/aborted/error。
-// 防重入：importing 期間拒收新檔（spec「匯入中防重入」）。
+// 匯入操作流程（app-import-gui spec）：判型確認（含歸屬成員選擇）→
+// 進度 → 報告卡/防護訊息。狀態機：idle → confirming → importing →
+// done/aborted/error。防重入：importing 期間拒收新檔。
+// 歸屬選擇（D1）：必選無預設、可就地新增成員；健保檔選定成員即時顯示
+// 身分證比對三態（attributionState 純函式，tests/ui/attribution.test.mjs
+// 直測），不符停用「開始匯入」；b1.1 預讀不可得時交引擎護欄第二層把關。
 import { registry } from "../adapters/index.js";
 import { tauriFileSource, resolveAppleDirTauri } from "../engine/tauri_source.js";
 import { nhiJsonAdapter } from "../adapters/nhi_json.js";
 import { nhiXmlAdapter } from "../adapters/nhi_xml.js";
+import { listProfiles, createProfile } from "../engine/profiles.js";
 
 const $ = (id) => document.getElementById(id);
 
-export function createImportFlow({ getDriver, labEntries, onImported }) {
+// 純函式：三態判定（app-import-gui spec）。member=null 表示未選。
+// 回傳 "none"（未選/非健保/預讀不到）| "bind"（將綁定）| "match" | "mismatch"
+export function attributionState(maskedId, member) {
+  if (!member || !maskedId) return "none";
+  if (!member.masked_id) return "bind";
+  return member.masked_id === maskedId ? "match" : "mismatch";
+}
+
+export function attributionNote(maskedId, member) {
+  const esc = escapeHtml;
+  switch (attributionState(maskedId, member)) {
+    case "bind":
+      return `<p>將把遮罩身分證 <strong>${esc(maskedId)}</strong> 綁定至成員「${esc(member.display_name)}」。</p>`;
+    case "match":
+      return `<p>檔案遮罩身分證與成員「${esc(member.display_name)}」相符。</p>`;
+    case "mismatch":
+      return `<p class="warn">檔案遮罩身分證 ${esc(maskedId)} 與成員「${esc(member.display_name)}」`
+        + `已綁定的 ${esc(member.masked_id)} 不符，請改選正確成員。</p>`;
+    default:
+      return "";
+  }
+}
+
+export function createImportFlow({ getDriver, labEntries, onImported,
+  onProfilesChanged }) {
   let state = "idle";
-  let pending = null; // { adapter, source, path }
+  let pending = null; // { adapter, source, path, maskedId, profileId }
 
   const panel = $("import-panel");
   const msg = $("import-msg");
@@ -54,53 +82,93 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
     const header = await source.readAt(0, Math.min(65536, source.size));
     const adapter = registry.detect(header, source.name);
     if (!adapter) {
-      say(`無法識別「${source.name}」。目前支援的格式：`);
+      say(`無法識別「${escapeHtml(source.name)}」。目前支援的格式：`);
       confirmBox.innerHTML = `<ul>${registry.formats()
         .map(f => `<li>${escapeHtml(f)}</li>`).join("")}</ul>`;
       show(confirmBox);
       state = "idle";
       return { state, rejected: "unknown_format", formats: registry.formats() };
     }
-    // 健保檔：歸戶確認整合進本面板（按「開始匯入」即確認，不另彈對話框；
-    // 2026-08-10 使用者走查回饋）。歸戶不符防護仍由引擎層把關。
-    let profileNote = "";
-    let assumeProfile = false;
+    // 健保檔：自 header 預讀遮罩身分證（64KB peek 的已知限制：讀不到時
+    // note 為空、engine 護欄把關）
+    let maskedId = null;
     if (adapter.id === "nhi_json" || adapter.id === "nhi_xml") {
       const headText = new TextDecoder("utf-8", { fatal: false }).decode(header);
       const m = headText.match(/"b1\.1"\s*:\s*"([^"]*)"/) || headText.match(/<b1\.1>([^<]*)<\/b1\.1>/);
-      const maskedId = m?.[1]?.trim() || null;
-      const [existing] = await getDriver().select(
-        "SELECT masked_id FROM profiles ORDER BY id LIMIT 1");
-      if (maskedId && !existing) {
-        profileNote = `<p>首次匯入：將以遮罩身分證 <strong>${escapeHtml(maskedId)}</strong> 建立本人資料。</p>`;
-        assumeProfile = true;
-      } else if (maskedId && existing && !existing.masked_id) {
-        profileNote = `<p>將把遮罩身分證 <strong>${escapeHtml(maskedId)}</strong> 綁定至既有資料。</p>`;
-      } else if (maskedId && existing?.masked_id && existing.masked_id !== maskedId) {
-        profileNote = `<p class="warn">注意：檔案遮罩身分證 ${escapeHtml(maskedId)} 與既有資料`
-          + `（${escapeHtml(existing.masked_id)}）不符，匯入將被阻擋。</p>`;
-      }
+      maskedId = m?.[1]?.trim() || null;
     }
-    pending = { adapter, source, path: filePath, assumeProfile };
+    pending = { adapter, source, path: filePath, maskedId, profileId: null };
     state = "confirming";
     say("");
-    confirmBox.innerHTML = `
-      <p class="fmt">${escapeHtml(adapter.formatDesc)}</p>
-      <p><span class="file-chip">${escapeHtml(source.name)}｜${(source.size / 1048576).toFixed(1)}MB</span></p>
-      ${profileNote}
-      <button id="import-go" type="button" class="primary">開始匯入</button>
-      <button id="import-cancel" type="button" class="btn">取消</button>`;
-    show(confirmBox);
-    $("import-go").addEventListener("click", () => runImport());
-    $("import-cancel").addEventListener("click", () => {
-      pending = null; state = "idle"; panel.hidden = true;
-    });
+    await renderConfirm();
     return { state, detected: adapter.id };
   }
 
+  // 判型確認面板：格式＋檔名＋歸屬成員選擇（必選無預設）＋三態提示
+  async function renderConfirm({ newMemberMode = false } = {}) {
+    const profiles = await listProfiles(getDriver());
+    const { adapter, source, maskedId, profileId } = pending;
+    const selected = profiles.find(p => p.id === profileId) ?? null;
+    const zeroMembers = profiles.length === 0;
+    const options = [
+      `<option value="" disabled ${profileId == null ? "selected" : ""}>請選擇成員</option>`,
+      ...profiles.map(p => `<option value="${p.id}" ${p.id === profileId ? "selected" : ""}>`
+        + `${escapeHtml(p.display_name)}${p.masked_id ? `（${escapeHtml(p.masked_id)}）` : ""}</option>`),
+      `<option value="__new__">＋新增成員…</option>`,
+    ].join("");
+    const mismatch = attributionState(maskedId, selected) === "mismatch";
+    const canGo = profileId != null && !mismatch;
+    confirmBox.innerHTML = `
+      <p class="fmt">${escapeHtml(adapter.formatDesc)}</p>
+      <p><span class="file-chip">${escapeHtml(source.name)}｜${(source.size / 1048576).toFixed(1)}MB</span></p>
+      <div class="attribution">
+        <label for="import-profile-select">這份資料屬於：</label>
+        ${zeroMembers && !newMemberMode
+          ? `<p>第一次使用：請先建立這份資料所屬的成員。</p>`
+          : `<select id="import-profile-select">${options}</select>`}
+        ${selected ? `<p class="attribution-chip">歸屬成員：<strong>${escapeHtml(selected.display_name)}</strong></p>` : ""}
+        ${attributionNote(maskedId, selected)}
+        <div id="import-new-member" ${zeroMembers || newMemberMode ? "" : "hidden"}>
+          <input id="import-new-name" type="text" placeholder="成員名稱（如：本人、媽媽）">
+          <button id="import-new-go" type="button" class="btn">建立成員</button>
+        </div>
+      </div>
+      <button id="import-go" type="button" class="primary" ${canGo ? "" : "disabled"}>開始匯入</button>
+      <button id="import-cancel" type="button" class="btn">取消</button>`;
+    show(confirmBox);
+    confirmBox.querySelector("#import-profile-select")?.addEventListener("change",
+      async (e) => {
+        if (e.target.value === "__new__") {
+          pending.profileId = null;
+          await renderConfirm({ newMemberMode: true });
+          confirmBox.querySelector("#import-new-name")?.focus();
+          return;
+        }
+        pending.profileId = Number(e.target.value);
+        await renderConfirm();
+      });
+    confirmBox.querySelector("#import-new-go")?.addEventListener("click", async () => {
+      const name = confirmBox.querySelector("#import-new-name").value;
+      try {
+        pending.profileId = await createProfile(getDriver(), name);
+        await onProfilesChanged?.();
+        await renderConfirm();
+      } catch (err) {
+        say(String(err.message || err));
+      }
+    });
+    $("import-go").addEventListener("click", () => runImport());
+    $("import-cancel").addEventListener("click", () => {
+      pending = null; state = "idle"; panel.hidden = true; say("");
+    });
+  }
+
   async function runImport() {
-    if (!pending || state === "importing") return { state };
-    const { adapter, source, path } = pending;
+    if (!pending || state === "importing" || pending.profileId == null) return { state };
+    const { adapter, source, path, profileId } = pending;
+    // 報告卡顯示歸屬成員（D1 防呆：Apple 檔人眼確認的最後一環）
+    const profiles = await listProfiles(getDriver());
+    const memberName = profiles.find(p => p.id === profileId)?.display_name ?? "";
     state = "importing";
     show(progressBox);
     bar.value = 0;
@@ -118,16 +186,8 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
       const src = needsBytes
         ? { bytes: await window.__TAURI__.fs.readFile(path), name: source.name }
         : source;
-      result = await adapter.importSource(src, getDriver(), progress, {
-        labEntries,
-        // 面板已揭露歸戶資訊並經「開始匯入」確認；peek 失敗時退原生對話框
-        assumeProfile: pending.assumeProfile,
-        confirmNewProfile: async (maskedId) => {
-          const ask = window.__TAURI__.dialog.ask || window.__TAURI__.dialog.default?.ask;
-          return ask(`首次匯入：以遮罩身分證 ${maskedId} 建立本人資料？`,
-            { title: "建立個人資料", kind: "info" });
-        },
-      });
+      result = await adapter.importSource(src, getDriver(), progress,
+        { labEntries, profileId });
     } catch (err) {
       state = "idle";
       pending = null;
@@ -140,16 +200,18 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
     }
     pending = null;
     state = "idle";
-    renderResult(result);
+    renderResult(result, memberName);
     if (result.status === "ok") await onImported?.(result);
     return { state, result };
   }
 
-  function renderResult(result) {
+  function renderResult(result, memberName) {
     say("");
     if (result.status === "skipped_duplicate") {
+      const origin = result.originDisplayName
+        ? `匯入至成員「${escapeHtml(result.originDisplayName)}」` : "匯入過";
       reportBox.innerHTML = `<p>此檔案先前已於 <strong>${escapeHtml(result.importedAt)}</strong>
-        匯入過（內容完全相同），已自動跳過，資料不會重複。</p>`;
+        ${origin}（內容完全相同），已自動跳過，資料不會重複。</p>`;
       show(reportBox);
       return;
     }
@@ -175,7 +237,7 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
     const unmapped = (r.unmapped_lab_names ?? []);
     const perr = r.source.parse_errors ?? [];
     reportBox.innerHTML = `
-      <h3>匯入完成：${escapeHtml(r.source.filename)}</h3>
+      <h3>匯入完成：${escapeHtml(r.source.filename)}（成員「${escapeHtml(memberName)}」）</h3>
       <table><thead><tr><th>節區</th><th>狀態</th><th>筆數</th></tr></thead>
         <tbody>${secRows}</tbody></table>
       <p>重複（冪等跳過）：${dedupText}</p>
@@ -196,6 +258,9 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
 // 錯誤訊息友善化（Karen 收尾檢核發現：技術訊息外洩）。回傳 [主訊息, 技術細節]
 export function friendlyError(err) {
   const raw = String(err?.message || err);
+  if (/歸屬成員/.test(raw)) {
+    return [raw, ""];
+  }
   if (/JSON/i.test(raw) && /(Unexpected|end of|parse)/i.test(raw)) {
     return ["檔案內容不完整或已損毀，請重新下載後再試一次。", raw];
   }

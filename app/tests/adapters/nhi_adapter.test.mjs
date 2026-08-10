@@ -9,6 +9,7 @@ import { initSchema } from "../../src/store/schema.js";
 import { nhiJsonAdapter } from "../../src/adapters/nhi_json.js";
 import { createRegistry } from "../../src/adapters/registry.js";
 import { EngineStore } from "../../src/engine/store.js";
+import { createProfile } from "../../src/engine/profiles.js";
 
 const REPO = new URL("../../..", import.meta.url).pathname;
 const FIXTURE = `${REPO}/tests/fixtures/nhi_sample.json`;
@@ -24,9 +25,17 @@ async function freshDriver() {
 const fixtureSource = () => ({
   bytes: new Uint8Array(readFileSync(FIXTURE)), name: "nhi_sample.json" });
 
+// 歸屬成員（opts.profileId 必填）：既有「本人」則沿用，否則建立
+async function ensureProfile(driver, name = "本人") {
+  const rows = await driver.select(
+    "SELECT id FROM profiles WHERE display_name=?", [name]);
+  return rows.length ? rows[0].id : createProfile(driver, name);
+}
+
 async function importFixture(driver, opts = {}) {
+  const profileId = opts.profileId ?? await ensureProfile(driver);
   return nhiJsonAdapter.importSource(fixtureSource(), driver, null,
-    { labEntries: LAB_ENTRIES, assumeProfile: true, ...opts });
+    { labEntries: LAB_ENTRIES, profileId, ...opts });
 }
 
 test("匯入 fixture：與 Python CLI 同檔逐表筆數一致", async () => {
@@ -62,7 +71,7 @@ test("藥局調劑日期回退：r1.5 空→r1.6，type=pharmacy_dispensing", as
     } } })),
   };
   const r = await nhiJsonAdapter.importSource(src, d, null,
-    { labEntries: LAB_ENTRIES, assumeProfile: true });
+    { labEntries: LAB_ENTRIES, profileId: await ensureProfile(d) });
   assert.equal(r.status, "ok");
   const rows = (await d.select("SELECT type, date FROM encounters")).map(r => ({ ...r }));
   assert.deepEqual(rows, [{ type: "pharmacy_dispensing", date: "2026-07-15" }]);
@@ -103,7 +112,7 @@ test("未知欄位保留：r1.99 進 extra_json 並列入報告統計", async ()
     } } })),
   };
   const r = await nhiJsonAdapter.importSource(src, d, null,
-    { labEntries: LAB_ENTRIES, assumeProfile: true });
+    { labEntries: LAB_ENTRIES, profileId: await ensureProfile(d) });
   const [{ extra_json }] = await d.select("SELECT extra_json FROM encounters");
   assert.ok(extra_json.includes("神祕值"));
   assert.deepEqual(r.report.source.unknown_fields, { r1: { "r1.99": 1 } });
@@ -124,7 +133,7 @@ test("部分失敗續行：單筆炸掉記入 parse_errors，其餘正常入庫"
     } } })),
   };
   const r = await nhiJsonAdapter.importSource(src, d, null,
-    { labEntries: LAB_ENTRIES, assumeProfile: true });
+    { labEntries: LAB_ENTRIES, profileId: await ensureProfile(d) });
   assert.equal(r.status, "ok");
   assert.equal(r.report.source.parse_errors.length, 1);
   assert.match(r.report.source.parse_errors[0], /^r1\[1\]/);
