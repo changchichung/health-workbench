@@ -3,6 +3,8 @@
 (function () {
   "use strict";
   const DATA = JSON.parse(document.getElementById("mhb-data").textContent);
+  // 視窗/分頁標題帶成員名（2026-08-10 走查回饋：多成員一目瞭然）
+  if (DATA.meta.profile) document.title = DATA.meta.profile + " 的個人健康資料工作台（私人）";
   const { h, render } = preact;
   const { useState, useMemo, useEffect } = preactHooks;
   const html = htm.bind(h);
@@ -444,7 +446,7 @@
       : html`<${Trends} key=${"r" + JSON.stringify(focus)} focus=${focus} />`;
     return html`<div>
       <header>
-        <h1>個人健康資料工作台</h1>
+        <h1>${DATA.meta.profile ? DATA.meta.profile + " 的個人健康資料工作台" : "個人健康資料工作台"}</h1>
         <p class="disclaimer">本頁僅協助整理、搜尋與視覺化您自行提供的健康資料，不提供診斷、
           治療、用藥或其他醫療判斷建議；資料可能不完整或有格式誤差，如有醫療問題請諮詢
           合格醫事人員。<b>本檔含個人醫療資料，請勿外傳。</b>

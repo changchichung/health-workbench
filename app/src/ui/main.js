@@ -65,6 +65,12 @@ async function refreshSwitcher() {
   return profiles;
 }
 
+// settings 一律讀取合併後回寫（單鍵覆寫會洗掉其他鍵，如記憶的目錄）
+async function updateSettings(patch) {
+  const s = await loadSettings(app.dbDir);
+  await saveSettings(app.dbDir, { ...s, ...patch }).catch(() => {});
+}
+
 // 切換／成員異動後的統一收斂點：驗證 currentProfileId、存 settings、
 // 刷新切換器＋狀態列＋檢視頁（匯入紀錄卡在 refreshStatus 內連帶刷新）
 async function setCurrentProfile(id, { save = true } = {}) {
@@ -72,12 +78,37 @@ async function setCurrentProfile(id, { save = true } = {}) {
   app.currentProfileId = resolveCurrentProfile(
     { current_profile_id: id }, profiles);
   if (save && app.currentProfileId != null) {
-    await saveSettings(app.dbDir,
-      { current_profile_id: app.currentProfileId }).catch(() => {});
+    await updateSettings({ current_profile_id: app.currentProfileId });
   }
   await refreshSwitcher();
   await refreshStatus();
-  await app.viewer?.refresh().catch(() => {});
+  // 檢視刷新失敗 NEVER 靜默（2026-08-10 走查回饋 3 的診斷面）
+  try {
+    await app.viewer?.refresh();
+  } catch (err) {
+    statusEl.textContent = `檢視頁載入失敗：${String(err?.message || err)}`;
+  }
+}
+
+// 對話框起始目錄：記憶上次使用的資料夾；首次開檔預設「下載項目」
+// （健保/Apple 匯出檔的常見落點）、匯出預設「文件」（2026-08-10 走查回饋 2）
+async function dialogStartDir(kind) {
+  const t = window.__TAURI__;
+  const s = await loadSettings(app.dbDir);
+  const remembered = kind === "export" ? s.last_export_dir : s.last_open_dir;
+  if (remembered && await t.fs.exists(remembered).catch(() => false)) {
+    return remembered;
+  }
+  const fallback = kind === "export" ? t.path.documentDir() : t.path.downloadDir();
+  return fallback.catch(() => null);
+}
+
+async function rememberDialogDir(kind, usedPath) {
+  if (!usedPath) return;
+  const dir = String(usedPath).replace(/[/\\][^/\\]+$/, "");
+  if (!dir) return;
+  await updateSettings(
+    kind === "export" ? { last_export_dir: dir } : { last_open_dir: dir });
 }
 
 async function boot() {
@@ -138,6 +169,7 @@ async function wireUi() {
     getDriver: () => app.driver,
     getDbPath: () => app.dbPath,
     getProfileId: () => app.currentProfileId,
+    getExportStartDir: () => dialogStartDir("export"),
     labEntries,
   });
   app.history = createHistory({
@@ -147,8 +179,11 @@ async function wireUi() {
   app.manager = createProfileManager({
     getDriver: () => app.driver,
     getCurrentProfileId: () => app.currentProfileId,
-    // 成員異動（新增/改名/刪除）→ 重新驗證當前成員並全面刷新
-    onChanged: async () => setCurrentProfile(app.currentProfileId),
+    // 成員異動（新增/改名/刪除）→ 清掉過時匯入面板、重新驗證當前成員並全面刷新
+    onChanged: async () => {
+      app.flow?.resetPanel();
+      await setCurrentProfile(app.currentProfileId);
+    },
   });
   app.flow = createImportFlow({
     getDriver: () => app.driver,
@@ -175,7 +210,10 @@ async function wireUi() {
     () => app.manager.open());
   document.getElementById("export-html-btn").addEventListener("click", async () => {
     const r = await app.viewer.exportHtml();
-    if (r.ok) statusEl.textContent = `已匯出：${r.path}（${(r.bytes / 1024).toFixed(0)}KB，含全部個資請妥善保管）`;
+    if (r.ok) {
+      await rememberDialogDir("export", r.path);
+      statusEl.textContent = `已匯出：${r.path}（${(r.bytes / 1024).toFixed(0)}KB，含全部個資請妥善保管）`;
+    }
   });
 
   await refreshSwitcher();
@@ -184,12 +222,31 @@ async function wireUi() {
   setTab(rendered ? "viewer" : "import");
 
   document.getElementById("dropzone").addEventListener("click", async () => {
-    const p = await dialogOpen({ multiple: false, title: "選擇健保存摺或 Apple 健康匯出檔" });
-    if (p) await app.flow.offerFile(p);
+    const p = await dialogOpen({ multiple: false, title: "選擇健保存摺或 Apple 健康匯出檔",
+      defaultPath: await dialogStartDir("open") });
+    if (p) {
+      await rememberDialogDir("open", p);
+      await app.flow.offerFile(p);
+    }
   });
-  document.getElementById("pick-dir-btn").addEventListener("click", async () => {
-    const p = await dialogOpen({ directory: true, title: "選擇 apple_health_export 資料夾" });
-    if (p) await app.flow.offerFile(p);
+  // 通用選檔（2026-08-10 走查回饋：與拖放同能力，健保/Apple 都走這顆；
+  // Apple 匯出「資料夾」情境用拖放，dropzone 文案已註明）
+  document.getElementById("pick-file-btn").addEventListener("click", async () => {
+    const p = await dialogOpen({ multiple: false, title: "選擇要匯入的檔案",
+      defaultPath: await dialogStartDir("open") });
+    if (p) {
+      await rememberDialogDir("open", p);
+      await app.flow.offerFile(p);
+    }
+  });
+  document.getElementById("gh-copy-btn").addEventListener("click", async () => {
+    const url = "https://github.com/notoriouslab/myhealthbank";
+    try {
+      await navigator.clipboard.writeText(url);
+      statusEl.textContent = "已複製 GitHub 連結，貼到瀏覽器開啟即可。";
+    } catch {
+      statusEl.textContent = `請手動複製：${url}`;
+    }
   });
   document.getElementById("import-db-btn").addEventListener("click", async () => {
     const p = await dialogOpen({ multiple: false, title: "選擇既有的 mhb.sqlite" });

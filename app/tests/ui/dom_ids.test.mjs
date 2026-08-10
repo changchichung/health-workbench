@@ -36,6 +36,14 @@ test("ui 模組的 getElementById 目標都在 index.html 或動態白名單", (
   assert.deepEqual(missing, [], `index.html 缺少 id：\n${missing.join("\n")}`);
 });
 
+test("hidden 全域護欄存在：author display 規則不得蓋過 hidden 屬性", () => {
+  // 2026-08-10 走查實踩：#profile-manager 的 display:flex 蓋過 UA 的
+  // [hidden]{display:none}，遮罩罩死全畫面。此規則被移除即重現。
+  const css = readFileSync(new URL("../../src/ui/style.css", import.meta.url), "utf-8");
+  assert.ok(css.includes("[hidden] { display: none !important; }"),
+    "style.css 必須含全域 [hidden] display:none !important 護欄");
+});
+
 test("動態白名單反向檢查：白名單 id 確實出現在某個 ui 模組的模板字串中", () => {
   const all = readdirSync(UI_DIR).filter(f => f.endsWith(".js"))
     .map(f => readFileSync(new URL(f, UI_DIR), "utf-8")).join("\n");

@@ -248,9 +248,23 @@ export function createImportFlow({ getDriver, labEntries, onImported,
     show(reportBox);
   }
 
+  // 成員異動（管理面板改名/刪除）後清掉過時面板內容：確認面板引用的
+  // 成員與報告卡上的歸屬名稱都可能已失效（2026-08-10 走查回饋 1）。
+  // 匯入進行中不動（交易完成後由結果呈現接手）。
+  function resetPanel() {
+    if (state === "importing") return;
+    pending = null;
+    state = "idle";
+    say("");
+    confirmBox.innerHTML = "";
+    reportBox.innerHTML = "";
+    panel.hidden = true;
+  }
+
   return {
     offerFile,
     runImport,
+    resetPanel,
     getState: () => state,
   };
 }
