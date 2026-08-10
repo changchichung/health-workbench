@@ -143,7 +143,12 @@ async function wireUi() {
 if (window.__TAURI__) {
   boot()
     .then(() => wireUi())
-    .catch((err) => { statusEl.textContent = `啟動失敗：${err.message || err}`; });
+    .catch((err) => {
+      const raw = String(err?.message || err);
+      statusEl.textContent = /database|open|readonly|permission/i.test(raw)
+        ? `無法建立或開啟資料庫，請確認應用程式資料目錄可寫入。（${raw}）`
+        : `啟動失敗：${raw}`;
+    });
 } else {
   statusEl.textContent = "非 Tauri 環境（瀏覽器預覽模式）。";
 }

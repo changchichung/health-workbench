@@ -131,10 +131,11 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
     } catch (err) {
       state = "idle";
       pending = null;
-      say(`匯入失敗：${err.message || err}`);
-      panel.hidden = false;
+      const [friendly, detail] = friendlyError(err);
+      say("");
+      reportBox.innerHTML = `<p class="warn">${escapeHtml(friendly)}</p>`
+        + (detail ? `<details><summary>技術細節</summary><p>${escapeHtml(detail)}</p></details>` : "");
       show(reportBox);
-      reportBox.innerHTML = "";
       return { state, error: String(err.message || err) };
     }
     pending = null;
@@ -190,6 +191,21 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
     runImport,
     getState: () => state,
   };
+}
+
+// 錯誤訊息友善化（Karen 收尾檢核發現：技術訊息外洩）。回傳 [主訊息, 技術細節]
+export function friendlyError(err) {
+  const raw = String(err?.message || err);
+  if (/JSON/i.test(raw) && /(Unexpected|end of|parse)/i.test(raw)) {
+    return ["檔案內容不完整或已損毀，請重新下載後再試一次。", raw];
+  }
+  if (/bdata|myhealthbank/i.test(raw) || err instanceof TypeError) {
+    return ["檔案結構與預期不符，請確認是健康存摺或 Apple 健康的原始匯出檔。", raw];
+  }
+  if (/找不到|不支援的 zip|非 Apple/i.test(raw)) {
+    return [raw, ""];
+  }
+  return ["匯入失敗，資料庫未寫入任何資料。可重新下載檔案後再試一次。", raw];
 }
 
 function escapeHtml(s) {
