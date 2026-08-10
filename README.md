@@ -14,14 +14,16 @@
 ```
 1. 下載自己的資料
    - 健保：登入健康存摺（myhealthbank.nhi.gov.tw）→ 下載「醫療類」
-     JSON 或 XML（兩種都支援）
-   - Apple：iPhone 健康 App → 個人頭像 → 匯出所有健康資料 → 把
+     資料（建議 JSON，內容比 XML 完整；兩種都支援）
+   - Apple：Apple 健康 App（iPhone）→ 個人頭像 → 匯出所有健康資料
+     （Apple Watch 的紀錄會一併包含）→ 把
      apple_health_export（zip 或資料夾）傳到電腦
 
 2. 匯入：拖進 App 視窗（或點擊選檔）→ 確認 → 看進度與結果報告
    - 自動判型、重複匯入自動跳過、不同人的檔案會被阻擋
 3. 檢視：「資料檢視」分頁即完整儀表板（總覽/時間軸/用藥/趨勢＋搜尋）
-4. 分享到 iPad 等裝置：「匯出單檔 HTML…」（檔案含全部個資，請妥善保管）
+4. 分享到其他裝置：「匯出單檔 HTML…」，任何裝置的瀏覽器都能直接開啟
+   （檔案含全部個資，請妥善保管）
 ```
 
 安裝包由 GitHub Actions 產出（macOS dmg／Windows 安裝檔，見 Actions

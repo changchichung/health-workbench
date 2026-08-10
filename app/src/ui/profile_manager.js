@@ -22,7 +22,8 @@ export function countsSummary(counts) {
   return parts.join("、") || "尚無資料";
 }
 
-export function createProfileManager({ getDriver, getCurrentProfileId, onChanged }) {
+export function createProfileManager({ getDriver, getCurrentProfileId, onChanged,
+  onImportDbFile }) {
   const box = document.getElementById("profile-manager");
   let confirmingDelete = null; // 進行中的刪除確認 { id, name, counts }
 
@@ -67,6 +68,11 @@ export function createProfileManager({ getDriver, getCurrentProfileId, onChanged
           <button id="pm-add-btn" type="button" class="primary">新增成員</button>
         </div>
         <div id="pm-inline" hidden></div>
+        <div class="pm-advanced">
+          <p class="dt">進階：從其他電腦搬資料過來？選擇舊電腦 App 資料目錄裡的
+            mhb.sqlite（或舊版命令列工具產生的資料庫檔）。</p>
+          <button id="pm-import-db" type="button" class="btn">匯入既有資料庫檔…</button>
+        </div>
         <div class="pm-foot"><button id="pm-close" type="button" class="btn">關閉</button></div>
       </div>`;
     wire();
@@ -74,6 +80,17 @@ export function createProfileManager({ getDriver, getCurrentProfileId, onChanged
 
   function wire() {
     box.querySelector("#pm-close").addEventListener("click", () => { box.hidden = true; });
+    box.querySelector("#pm-import-db")?.addEventListener("click", async () => {
+      const r = await onImportDbFile?.();
+      if (r?.ok) {
+        await render();
+        await onChanged?.();
+        say(`已匯入資料庫（schema v${r.version}）。`, false);
+      } else if (r && r.reason !== "cancelled") {
+        say(r.reason === "too_new" ? "此資料庫版本較新，請先更新 App。"
+          : "所選檔案不是本工具的資料庫檔。");
+      }
+    });
     box.querySelector("#pm-add-btn").addEventListener("click", async () => {
       const name = box.querySelector("#pm-new-name").value;
       try {

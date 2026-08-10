@@ -173,3 +173,5 @@ button.linklike {
   border: none; background: none; color: var(--accent); cursor: pointer;
   font: inherit; padding: 0 4px; text-decoration: underline;
 }
+.pm-advanced { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.pm-advanced p { margin: 0 0 6px; font-size: 12.5px; }

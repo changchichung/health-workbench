@@ -184,6 +184,13 @@ async function wireUi() {
       app.flow?.resetPanel();
       await setCurrentProfile(app.currentProfileId);
     },
+    // 進階：匯入既有資料庫檔（2026-08-10 裁示自工具列降級收進面板；
+    // 用途＝換電腦搬資料、舊 CLI 庫一次性遷移）
+    onImportDbFile: async () => {
+      const p = await dialogOpen({ multiple: false, title: "選擇既有的 mhb.sqlite" });
+      if (!p) return { ok: false, reason: "cancelled" };
+      return importExisting(p);
+    },
   });
   app.flow = createImportFlow({
     getDriver: () => app.driver,
@@ -247,10 +254,6 @@ async function wireUi() {
     } catch {
       statusEl.textContent = `請手動複製：${url}`;
     }
-  });
-  document.getElementById("import-db-btn").addEventListener("click", async () => {
-    const p = await dialogOpen({ multiple: false, title: "選擇既有的 mhb.sqlite" });
-    if (p) await importExisting(p);
   });
 
   // 原生拖放（Tauri drag-drop 事件；HTML5 drop 在 Tauri 內拿不到路徑）
