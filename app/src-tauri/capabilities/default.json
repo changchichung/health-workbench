@@ -17,7 +17,12 @@
     },
     {
       "identifier": "fs:allow-write-text-file",
-      "allow": [{ "path": "/private/tmp/**" }, { "path": "/tmp/**" }]
+      "allow": [
+        { "path": "$APPDATA" },
+        { "path": "$APPDATA/**" },
+        { "path": "/private/tmp/**" },
+        { "path": "/tmp/**" }
+      ]
     },
     {
       "identifier": "fs:allow-remove",

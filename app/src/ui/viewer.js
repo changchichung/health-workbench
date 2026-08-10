@@ -21,6 +21,7 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
   const frame = document.getElementById("viewer-frame");
   const emptyEl = document.getElementById("viewer-empty");
   const exportBtn = document.getElementById("export-html-btn");
+  const EMPTY_TEXT = emptyEl.textContent; // 首啟引導原文（載入提示後要還原）
 
   // 解析順序：db 同目錄（使用者可自行更新快取，Python 慣例）→ bundle 資源
   async function drugCachePath() {
@@ -39,6 +40,7 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
   function showEmpty() {
     frame.hidden = true;
     exportBtn.hidden = true;
+    emptyEl.textContent = EMPTY_TEXT;
     emptyEl.hidden = false;
     lastHtml = null;
     lastMemberName = null;
@@ -49,6 +51,11 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
     const driver = getDriver();
     const profileId = getProfileId();
     if (profileId == null) return showEmpty();
+    // 先遮住舊內容再查新資料（Karen HIGH-1：大量資料下 payload 組裝
+    // 需 2-3 秒，不遮會出現「新成員標籤配舊成員病歷」的錯配窗）
+    frame.hidden = true;
+    emptyEl.textContent = "正在載入資料…";
+    emptyEl.hidden = false;
     const [{ c }] = await driver.select(
       "SELECT (SELECT count(*) FROM encounters WHERE profile_id=?)"
       + " + (SELECT count(*) FROM apple_records WHERE profile_id=?) c",

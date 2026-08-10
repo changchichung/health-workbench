@@ -9,9 +9,16 @@ export const PROFILE_DATA_TABLES = [
   "source_documents",
 ];
 
+const NAME_MAX = 30;
+
 function normalizeName(displayName) {
   const name = String(displayName ?? "").trim();
   if (!name) throw new Error("成員名稱不可為空白。");
+  // 上限防外溢（Karen MEDIUM-2：名稱直入匯出檔名與 UI 版面，
+  // macOS 檔名上限 255 bytes，超長會讓匯出無聲失敗）
+  if (name.length > NAME_MAX) {
+    throw new Error(`成員名稱請在 ${NAME_MAX} 字以內。`);
+  }
   return name;
 }
 

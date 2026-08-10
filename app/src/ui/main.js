@@ -76,10 +76,16 @@ async function refreshSwitcher() {
   return profiles;
 }
 
-// settings 一律讀取合併後回寫（單鍵覆寫會洗掉其他鍵，如記憶的目錄）
+// settings 一律讀取合併後回寫（單鍵覆寫會洗掉其他鍵，如記憶的目錄）。
+// 寫入失敗 NEVER 靜默（Karen 稽核 CRITICAL-1：出貨 ACL 擋寫時，靜默
+// 失敗＝「成員記憶」整個功能無聲失效且手測不可見）
 async function updateSettings(patch) {
   const s = await loadSettings(app.dbDir);
-  await saveSettings(app.dbDir, { ...s, ...patch }).catch(() => {});
+  try {
+    await saveSettings(app.dbDir, { ...s, ...patch });
+  } catch (err) {
+    notify(`設定無法儲存（下次開啟可能不會記住目前成員）：${String(err?.message || err)}`, 10000);
+  }
 }
 
 // 切換／成員異動後的統一收斂點：驗證 currentProfileId、存 settings、
@@ -132,6 +138,11 @@ async function boot() {
   const profiles = await listProfiles(app.driver);
   app.currentProfileId = resolveCurrentProfile(
     await loadSettings(app.dbDir), profiles);
+  // 開機落章：settings 寫入路徑在首次啟動就被驗證（Karen CRITICAL-1
+  // 驗收條件：正式安裝路徑下 settings.json 必須真的存在）
+  if (app.currentProfileId != null) {
+    await updateSettings({ current_profile_id: app.currentProfileId });
+  }
   return { path, overridden };
 }
 
@@ -206,8 +217,13 @@ async function wireUi() {
   app.flow = createImportFlow({
     getDriver: () => app.driver,
     labEntries,
-    // 匯入面板就地新增成員 → 切換器同步
-    onProfilesChanged: async () => { await refreshSwitcher(); },
+    // 匯入面板就地新增成員 → 切換器同步；若此前零成員（currentProfileId
+    // 為 null），必須立刻收斂當前成員，否則取消匯入後 header 與狀態列
+    // 不一致且下拉點不動（Karen MEDIUM-1）
+    onProfilesChanged: async () => {
+      if (app.currentProfileId == null) await setCurrentProfile(null);
+      else await refreshSwitcher();
+    },
     onImported: async () => {
       await setCurrentProfile(app.currentProfileId);
       const report = document.getElementById("import-report");
@@ -227,10 +243,20 @@ async function wireUi() {
   document.getElementById("manage-profiles-btn").addEventListener("click",
     () => app.manager.open());
   document.getElementById("export-html-btn").addEventListener("click", async () => {
-    const r = await app.viewer.exportHtml();
+    // 匯出失敗 NEVER 無聲（Karen HIGH-2：磁碟滿/唯讀/超長檔名原本
+    // 表現為「按了沒反應」）
+    let r;
+    try {
+      r = await app.viewer.exportHtml();
+    } catch (err) {
+      notify(`匯出失敗：${String(err?.message || err)}`, 10000);
+      return;
+    }
     if (r.ok) {
       await rememberDialogDir("export", r.path);
       notify(`已匯出：${r.path}（${(r.bytes / 1024).toFixed(0)}KB，含全部個資請妥善保管）`, 10000);
+    } else if (r.reason === "no_data") {
+      notify("目前成員尚無資料可匯出。");
     }
   });
 

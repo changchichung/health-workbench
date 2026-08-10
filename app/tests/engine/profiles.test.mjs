@@ -74,6 +74,17 @@ test("createProfile：空白名與重名（含空白變體）拒絕", async () =
   await d.close();
 });
 
+test("createProfile/renameProfile：超過 30 字拒絕（防匯出檔名外溢）", async () => {
+  const d = await freshDb();
+  const long = "啊".repeat(31);
+  await assert.rejects(() => createProfile(d, long), /30 字/);
+  const id = await createProfile(d, "本人");
+  await assert.rejects(() => renameProfile(d, id, long), /30 字/);
+  await createProfile(d, "啊".repeat(30)); // 恰好 30 字合法
+  assert.equal((await listProfiles(d)).length, 2);
+  await d.close();
+});
+
 test("renameProfile：改名成功、資料歸屬不變；重名拒絕；改成自己原名允許", async () => {
   const d = await freshDb();
   const a = await createProfile(d, "本人");

@@ -20,7 +20,7 @@
      apple_health_export（zip 或資料夾）傳到電腦
 
 2. 匯入：拖進 App 視窗（或點擊選檔）→ 選擇這份資料屬於哪位成員 →
-   確認 → 看進度與結果報告
+   按「開始匯入」→ 看進度與結果報告
    - 自動判型、重複匯入自動跳過；健保檔以遮罩身分證驗證歸屬，
      選錯成員會被阻擋
 3. 檢視：「資料檢視」分頁即完整儀表板（總覽/時間軸/用藥/趨勢＋搜尋）；
@@ -68,7 +68,7 @@ bin/mhb knowledge update         # 更新健保藥品品項快取（建議每季
 - App：Tauri 2（Rust 殼僅 SQLite 橋與插件，業務邏輯全在 `app/src/` JS）；
   前端 Preact + htm（vendored，免 build）。
 - Python 3.13 標準庫 + PyYAML（oracle 與 CLI）。
-- 測試：`cd app && npm test`（55 項，含與 Python 的差分對帳）；
+- 測試：`cd app && npm test`（99 項，含與 Python 的差分對帳）；
   `python3 -m pytest tests/`；端到端：`scripts/e2e_idempotency.sh`。
 - CI：`.github/workflows/app-build.yml`（測試＋守衛 → 雙平台建置）。
 - 規格 SSOT：`openspec/`；格式研究：`docs/20260808_phase0_findings.md`。
