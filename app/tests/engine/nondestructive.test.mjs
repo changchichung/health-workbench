@@ -154,9 +154,11 @@ test("D7-3 跨成員重複檔：跳過且全庫全等", async () => {
   const r = await nhiJsonAdapter.importSource(
     nhiSource("a1-again.json", "A12345****", [rec("20260101"), rec("20260102")]),
     d, null, IMPORT_OPTS(b));
-  // 同位元組內容 → 同 SHA-256 → 命中 A 的原始檔（歸戶檢查先擋或指紋先擋
-  // 皆為零寫入路徑；此處 b1.1=A 與 B 已綁定不符 → aborted）
-  assert.ok(["aborted", "skipped_duplicate"].includes(r.status), r.status);
+  // 同位元組內容 → 同 SHA-256 → 重複檔判定先於歸戶護欄（spec：不論
+  // 本次歸屬選誰，一律跳過並附原歸屬與時間）
+  assert.equal(r.status, "skipped_duplicate");
+  assert.equal(r.originDisplayName, "本人");
+  assert.ok(r.importedAt);
   assertUnchanged(before, await snapshot(d));
   await d.close();
 });

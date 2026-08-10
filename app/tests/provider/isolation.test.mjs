@@ -12,6 +12,8 @@ import { nhiJsonAdapter } from "../../src/adapters/nhi_json.js";
 import { appleHealthAdapter } from "../../src/adapters/apple_health.js";
 import { createProfile } from "../../src/engine/profiles.js";
 import { buildPayload } from "../../src/provider/payload.js";
+import { assemble } from "../../src/provider/assemble.js";
+import { readFileSync } from "node:fs";
 
 const MARKER_B = "ISOLATION_MARKER_B";
 const MARKER_A = "ISOLATION_MARKER_A";
@@ -100,6 +102,26 @@ test("meta 邊界：profile=當前成員名、counts.profiles=全庫、sources �
     assert.ok(!s.filename.includes(MARKER_B), `sources 夾帶他人檔名：${s.filename}`);
   }
   assert.ok(p.meta.counts.encounters >= 1);
+  await d.close();
+});
+
+test("匯出檔層級隔離：assemble(A) 的完整單檔 HTML 零出現 B 的 marker", async () => {
+  // exportHtml 寫出的就是 assemble(payload) 字串（app-viewer spec
+  // 「匯出僅當前成員」scenario 的自動化面；Jenny 稽核補：payload 層
+  // 掃描不能替代匯出檔層掃描的聲明）
+  const { d, a } = await twoMemberDb();
+  const payload = await buildPayload(d,
+    { profileId: a, knowledgeEntries: [], drugCachePath: null, today: "2026-08-10" });
+  const A = new URL("../../src/viewer/assets/", import.meta.url);
+  const assets = {
+    appJs: readFileSync(new URL("app.js", A), "utf-8"),
+    css: readFileSync(new URL("style.css", A), "utf-8"),
+    vendor: ["preact.min.js", "hooks.umd.js", "htm.umd.js"].map(
+      f => readFileSync(new URL(`vendor/${f}`, A), "utf-8")),
+  };
+  const html = assemble(payload, assets);
+  assert.ok(!html.includes(MARKER_B), "匯出 HTML 洩漏他成員資料");
+  assert.ok(html.includes(MARKER_A), "匯出 HTML 應含自己的資料");
   await d.close();
 });
 

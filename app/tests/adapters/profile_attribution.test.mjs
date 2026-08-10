@@ -106,7 +106,29 @@ test("缺 profileId 即錯：NHI 與 Apple 皆明確失敗，不回退第一個�
   await d.close();
 });
 
-test("跨成員重複檔案：訊息附原歸屬成員與時間，零寫入", async () => {
+test("跨成員重複檔案（健保）：重複判定先於護欄，跳過並附原歸屬與時間", async () => {
+  const d = await freshDb();
+  const me = await createProfile(d, "本人");
+  const mom = await createProfile(d, "媽媽");
+  const src = nhiSource("A12345****");
+  const r1 = await nhiJsonAdapter.importSource(src, d, null,
+    { labEntries: [], profileId: me });
+  assert.equal(r1.status, "ok");
+  const store = new EngineStore(d);
+  const before = await store.tableCounts();
+  // 同一份檔（同 bytes）誤選媽媽重匯：不得被歸戶護欄以「選錯人」中止，
+  // 必須以「已匯入至成員「本人」」跳過（app-import-engine spec scenario）
+  const r2 = await nhiJsonAdapter.importSource(src, d, null,
+    { labEntries: [], profileId: mom });
+  assert.equal(r2.status, "skipped_duplicate");
+  assert.equal(r2.originDisplayName, "本人");
+  assert.ok(r2.importedAt);
+  assert.match(r2.messages.at(-1), /匯入至成員「本人」/);
+  assert.deepEqual(await store.tableCounts(), before, "零寫入");
+  await d.close();
+});
+
+test("跨成員重複檔案（Apple）：訊息附原歸屬成員與時間，零寫入", async () => {
   const d = await freshDb();
   const me = await createProfile(d, "本人");
   const mom = await createProfile(d, "媽媽");

@@ -71,9 +71,22 @@ export async function importNhiBdata(bdata, meta, driver, progress, opts = {}) {
   const profile = await requireProfile(driver, opts.profileId);
 
   return driver.transaction(async () => {
+      // 重複檔判定先於歸戶護欄（Jenny 稽核修正，2026-08-10）：同一檔案
+      // 不論本次歸屬選誰，一律以「已於（時間）匯入至成員 X」跳過——
+      // 「這檔已匯過」比「你選錯人了」更貼近事實（app-import-engine/
+      // app-import-gui spec 跨成員重複檔 scenario）。未命中時插入的
+      // source_documents 列若隨後被護欄中止，由交易回滾清除（零寫入）。
+      const pid = profile.id;
+      const { docId, importedAt, originDisplayName } = await store.registerSource(
+        pid, meta.name, sha256, meta.adapter, ADAPTER_VERSION);
+      if (importedAt) {
+        messages.push(`此檔案已於 ${importedAt} 匯入至成員`
+          + `「${originDisplayName}」（SHA-256 相同），跳過。`);
+        return { status: "skipped_duplicate", importedAt, originDisplayName, messages };
+      }
+
       // 遮罩身分證護欄（對所選成員）：缺 b1.1 中止／已綁定必須相符／
       // 未綁定先查身分證未屬他人再綁定（選錯成員防護）
-      const pid = profile.id;
       if (!maskedId) {
         messages.push("匯入中止：檔案缺少遮罩身分證（b1.1），無法確認歸戶。");
         throw new AbortImport(messages);
@@ -97,14 +110,6 @@ export async function importNhiBdata(bdata, meta, driver, progress, opts = {}) {
         }
         await driver.execute("UPDATE profiles SET masked_id=? WHERE id=?", [maskedId, pid]);
         messages.push(`已將遮罩身分證 ${maskedId} 綁定至成員「${profile.display_name}」。`);
-      }
-
-      const { docId, importedAt, originDisplayName } = await store.registerSource(
-        pid, meta.name, sha256, meta.adapter, ADAPTER_VERSION);
-      if (importedAt) {
-        messages.push(`此檔案已於 ${importedAt} 匯入至成員`
-          + `「${originDisplayName}」（SHA-256 相同），跳過。`);
-        return { status: "skipped_duplicate", importedAt, originDisplayName, messages };
       }
 
       const sections = {};
