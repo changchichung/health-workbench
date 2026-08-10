@@ -109,7 +109,7 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
       window.__MHB_PROGRESS_EVENTS__ = (window.__MHB_PROGRESS_EVENTS__ || 0) + 1;
       if (totalBytes > 0) bar.value = Math.min(100, (readBytes / totalBytes) * 100);
       progressText.textContent = processed === 0
-        ? `正在檢查檔案（計算指紋）…（${Math.round(bar.value)}%）`
+        ? `正在檢查檔案是否曾經匯入…（${Math.round(bar.value)}%）`
         : `已處理 ${processed.toLocaleString()} 筆（${Math.round(bar.value)}%）`;
     };
     let result;
@@ -149,8 +149,8 @@ export function createImportFlow({ getDriver, labEntries, onImported }) {
   function renderResult(result) {
     say("");
     if (result.status === "skipped_duplicate") {
-      reportBox.innerHTML = `<p>此檔案已於 <strong>${escapeHtml(result.importedAt)}</strong>
-        匯入過（SHA-256 相同），已跳過，資料庫未變動。</p>`;
+      reportBox.innerHTML = `<p>此檔案先前已於 <strong>${escapeHtml(result.importedAt)}</strong>
+        匯入過（內容完全相同），已自動跳過，資料不會重複。</p>`;
       show(reportBox);
       return;
     }

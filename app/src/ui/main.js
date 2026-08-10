@@ -6,9 +6,10 @@ import { initSchema, SCHEMA_VERSION } from "../store/schema.js";
 import { resolveDbPath, importExistingDb } from "../store/location.js";
 import { createImportFlow } from "./import_flow.js";
 import { createViewer } from "./viewer.js";
+import { createHistory } from "./history.js";
 
 const statusEl = document.getElementById("status");
-const app = { driver: null, dbPath: null, flow: null, viewer: null };
+const app = { driver: null, dbPath: null, flow: null, viewer: null, history: null };
 
 async function tableCounts(driver) {
   const tables = ["encounters", "medications", "lab_results", "apple_records"];
@@ -24,8 +25,9 @@ async function refreshStatus() {
   const counts = await tableCounts(app.driver);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   statusEl.textContent = total === 0
-    ? `尚無資料。請匯入健保存摺或 Apple 健康匯出檔。（資料庫：${app.dbPath}）`
-    : `資料庫：${app.dbPath}｜就醫 ${counts.encounters}、用藥 ${counts.medications}、檢驗 ${counts.lab_results}、Apple ${counts.apple_records}`;
+    ? "尚無資料。請匯入健保存摺或 Apple 健康匯出檔。"
+    : `就醫 ${counts.encounters}、用藥 ${counts.medications}、檢驗 ${counts.lab_results}、Apple ${counts.apple_records.toLocaleString()}`;
+  await app.history?.refresh().catch(() => {});
   return counts;
 }
 
@@ -86,6 +88,11 @@ async function wireUi() {
     getDbPath: () => app.dbPath,
     labEntries,
   });
+  app.history = createHistory({
+    getDriver: () => app.driver,
+    getDbPath: () => app.dbPath,
+  });
+  await app.history.refresh();
   app.flow = createImportFlow({
     getDriver: () => app.driver,
     labEntries,
