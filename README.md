@@ -137,7 +137,7 @@ Safari 或 Chrome 直接開啟本機 HTML 檔案，而「檔案」App 的預覽�
 | 平台 | 下載 | 開啟說明 |
 |------|------|---------|
 | **macOS** | `.dmg`（Apple Silicon；Intel 版後續提供） | DMG 內附「使用說明（請先閱讀）.txt」 |
-| **Windows** | `.msi` 或 `.exe`（x64） | 一併下載「使用說明-Windows.txt」 |
+| **Windows** | `.msi` 或 `.exe`（x64） | 一併下載 `README-Windows.txt` |
 
 產物尚未經過簽章，首次開啟需手動放行：
 

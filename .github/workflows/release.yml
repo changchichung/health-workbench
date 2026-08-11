@@ -89,8 +89,8 @@ jobs:
 
             - macOS：下載 `.dmg`。DMG 內附「使用說明（請先閱讀）.txt」，
               放行與上手步驟都在裡面；或按住 Control 點 App 圖示 →「開啟」
-            - Windows：下載 `.msi` 或 `.exe`，說明請一併下載
-              「使用說明-Windows.txt」。SmartScreen 出現時點
+            - Windows：下載 `.msi` 或 `.exe`，使用說明請一併下載
+              `README-Windows.txt`（繁體中文）。SmartScreen 出現時點
               「其他資訊」→「仍要執行」
 
             完整說明見 README，變更明細見 CHANGELOG。
@@ -115,5 +115,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp packaging/windows-readme.txt "使用說明-Windows.txt"
-          gh release upload "v${{ needs.version-gate.outputs.version }}" "使用說明-Windows.txt" --clobber
+          # 資產名稱必須是 ASCII：GitHub 會把 release 資產名的非 ASCII 字元
+          # 剝掉（2026-08-12 實測「使用說明-Windows.txt」變成「-Windows.txt」）
+          cp packaging/windows-readme.txt README-Windows.txt
+          gh release upload "v${{ needs.version-gate.outputs.version }}" README-Windows.txt --clobber
