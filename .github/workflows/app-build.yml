@@ -26,7 +26,7 @@ jobs:
           ! grep -rEn "parse|adapter|schema|fingerprint|knowledge|quality_flag" app/src-tauri/src/
       - name: 守衛：workflow 不引用個資目錄
         run: |
-          ! grep -n "d""ata/" .github/workflows/app-build.yml
+          ! grep -rn "d""ata/" .github/workflows/
       - name: node 測試全套（含 parity fixture、禁用詞、labs.json 新鮮度）
         working-directory: app
         run: |

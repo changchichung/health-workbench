@@ -1,0 +1,89 @@
+# 發布流程：推 semver tag（如 v0.5.0）→ 版本一致性關卡 → 全測試 →
+# 雙平台建置並發成 GitHub release（草稿，人工檢視後手動 publish）。
+# 產物走內建 GITHUB_TOKEN，零長期密鑰（first-release 精神）。
+# 個資紀律：CI 僅用去識別化 fixtures，一律不得引用個資目錄。
+name: release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要發布的版本 tag（如 v0.5.0，須與 manifest 版本一致）"
+        required: true
+
+permissions:
+  contents: write # 建立 release 需寫入權限
+
+jobs:
+  # 版本三方一致關卡：tag 版本 == tauri.conf.json == package.json == Cargo.toml
+  version-gate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 版本一致性斷言
+        id: check
+        run: |
+          RAW="${{ github.event.inputs.tag || github.ref_name }}"
+          VER="${RAW#v}"
+          echo "tag 版本＝$VER"
+          fail=0
+          grep -q "\"version\": \"$VER\"" app/src-tauri/tauri.conf.json || { echo "tauri.conf.json 版本不符"; fail=1; }
+          grep -q "\"version\": \"$VER\"" app/package.json || { echo "package.json 版本不符"; fail=1; }
+          grep -q "^version = \"$VER\"" app/src-tauri/Cargo.toml || { echo "Cargo.toml 版本不符"; fail=1; }
+          grep -q "## $VER" CHANGELOG.md || { echo "CHANGELOG 缺 $VER 段落"; fail=1; }
+          [ "$fail" = "0" ] || { echo "::error::版本不一致，發布中止"; exit 1; }
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: version-gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安裝 Python 依賴（oracle 端）
+        run: pip install pyyaml
+      - name: node 測試全套
+        working-directory: app
+        run: |
+          npm ci
+          npm test
+
+  release:
+    needs: [version-gate, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - name: npm 依賴
+        working-directory: app
+        run: npm ci
+      - name: Tauri 建置並上傳至 release（草稿）
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: app
+          tagName: v${{ needs.version-gate.outputs.version }}
+          releaseName: "MyHealthBank v${{ needs.version-gate.outputs.version }}"
+          releaseBody: "安裝與放行說明見 README；變更明細見 CHANGELOG。產物未簽章。"
+          releaseDraft: true
+          prerelease: false

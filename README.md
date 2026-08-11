@@ -2,10 +2,19 @@
 
 # MyHealthBank — 個人健康資料工作台
 
+[![Release](https://img.shields.io/github/v/release/notoriouslab/myhealthbank?style=flat-square)](https://github.com/notoriouslab/myhealthbank/releases)
+[![License: MIT](https://img.shields.io/github/license/notoriouslab/myhealthbank?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/平台-macOS%20%2B%20Windows-0A84FF?style=flat-square)](https://github.com/notoriouslab/myhealthbank/releases)
+[![Built with Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri)](https://tauri.app/)
+[![Local-first](https://img.shields.io/badge/本機優先-不上雲-34C759?style=flat-square)]()
+[![Last Commit](https://img.shields.io/github/last-commit/notoriouslab/myhealthbank?style=flat-square)](https://github.com/notoriouslab/myhealthbank/commits)
+
 **把健保「健康存摺」與 Apple 健康的下載檔，變成一份越養越深、可搜尋、
 可帶去回診討論的家庭健康紀錄。全程本機，資料不離開你的電腦。**
 
 macOS／Windows 桌面 App · 不需要帳號 · 檢視時不需要網路
+
+屬於 [notoriouslab](https://github.com/notoriouslab) 開源工具組的一員
 
 </div>
 
@@ -60,9 +69,20 @@ MyHealthBank 把兩邊的下載檔整理進同一個本機資料庫：每隔一�
 
 ## 安裝
 
-安裝包由 GitHub Actions 自動建置（macOS dmg／Windows 安裝檔，見
-Actions artifacts）；或本機建置：`cd app && npm ci && npx tauri build`。
-產物尚未簽章，自建自用不受影響；分發他人前需補簽章。
+到 [Releases](https://github.com/notoriouslab/myhealthbank/releases) 下載對應平台的安裝包：
+
+| 平台 | 下載 |
+|------|------|
+| **macOS** | `.dmg`（Apple Silicon／Intel） |
+| **Windows** | `.msi` 或 `.exe` |
+
+產物尚未經過簽章，首次開啟需手動放行：
+
+- **macOS**：右鍵點 App →「開啟」（或系統設定 → 隱私權與安全性 → 仍要開啟）；
+  或在終端機執行一次 `xattr -cr /Applications/MyHealthBank.app`
+- **Windows**：SmartScreen 出現時點「其他資訊」→「仍要執行」
+
+也可自行建置：`cd app && npm ci && npx tauri build`。
 
 ---
 
