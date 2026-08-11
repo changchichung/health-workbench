@@ -85,7 +85,7 @@ jobs:
           tagName: v${{ needs.version-gate.outputs.version }}
           releaseName: "MyHealthBank v${{ needs.version-gate.outputs.version }}"
           releaseBody: |
-            產物未簽章，首次開啟需手動放行。
+            App 程式尚未經過簽章，首次開啟需手動放行。
 
             - macOS：下載 `.dmg`。DMG 內附「使用說明（請先閱讀）.txt」，
               放行與上手步驟都在裡面；或按住 Control 點 App 圖示 →「開啟」

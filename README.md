@@ -14,6 +14,11 @@
 
 macOS／Windows 桌面 App · 不需要帳號 · 檢視時不需要網路
 
+### [⬇️ 前往下載](https://github.com/notoriouslab/myhealthbank/releases/latest)
+
+（macOS 選 `.dmg`；Windows 選 `.msi` 或 `.exe`。安裝與首次開啟說明見下方
+[安裝](#安裝)）
+
 屬於 [notoriouslab](https://github.com/notoriouslab) 開源工具組的一員
 
 </div>
@@ -85,6 +90,24 @@ macOS／Windows 桌面 App · 不需要帳號 · 檢視時不需要網路
 
 ![檢驗趨勢](docs/screenshots/trends.png)
 
+## 安裝
+
+到 [Releases](https://github.com/notoriouslab/myhealthbank/releases) 下載對應平台的安裝包：
+
+| 平台 | 下載 | 開啟說明 |
+|------|------|---------|
+| **macOS** | `.dmg`（Apple Silicon；Intel 版後續提供） | DMG 內附「使用說明（請先閱讀）.txt」 |
+| **Windows** | `.msi` 或 `.exe`（x64） | 一併下載 `README-Windows.txt` |
+
+App 程式尚未經過簽章，首次開啟需手動放行：
+
+- **macOS**：按住 Control 點 App 圖示 →「開啟」（或系統設定 →
+  隱私權與安全性 → 仍要開啟）；或在終端機執行一次
+  `xattr -cr /Applications/MyHealthBank.app`
+- **Windows**：SmartScreen 出現時點「其他資訊」→「仍要執行」
+
+也可自行建置：`cd app && npm ci && npx tauri build`（需先安裝 Rust）。
+
 ## 快速上手（三步）
 
 1. **下載自己的資料**
@@ -129,24 +152,6 @@ Safari 或 Chrome 直接開啟本機 HTML 檔案，而「檔案」App 的預覽�
 - 匯出的儀表板檔名帶 `-private` 字樣、頁首有紅字提醒，內含全部
   嵌入資料，請勿外傳。
 - 想清空一切：刪掉上面那個資料夾就結束了。
-
-## 安裝
-
-到 [Releases](https://github.com/notoriouslab/myhealthbank/releases) 下載對應平台的安裝包：
-
-| 平台 | 下載 | 開啟說明 |
-|------|------|---------|
-| **macOS** | `.dmg`（Apple Silicon；Intel 版後續提供） | DMG 內附「使用說明（請先閱讀）.txt」 |
-| **Windows** | `.msi` 或 `.exe`（x64） | 一併下載 `README-Windows.txt` |
-
-產物尚未經過簽章，首次開啟需手動放行：
-
-- **macOS**：按住 Control 點 App 圖示 →「開啟」（或系統設定 →
-  隱私權與安全性 → 仍要開啟）；或在終端機執行一次
-  `xattr -cr /Applications/MyHealthBank.app`
-- **Windows**：SmartScreen 出現時點「其他資訊」→「仍要執行」
-
-也可自行建置：`cd app && npm ci && npx tauri build`（需先安裝 Rust）。
 
 ## 參與開發
 
