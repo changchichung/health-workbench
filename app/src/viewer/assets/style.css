@@ -52,7 +52,10 @@ input[type="search"] { flex: 1; }
 section { display: block; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 14px; margin: 14px 0; }
-.card { background: var(--card); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); }
+/* min-width:0 讓卡片能收窄到 grid 軌道寬度：grid item 預設最小尺寸為
+   min-content，內含寬表格或圖表時會把卡片撐出容器造成整頁左右滑 */
+.card { background: var(--card); border-radius: 16px; padding: 16px;
+  box-shadow: var(--shadow); min-width: 0; }
 .card.wide { grid-column: 1 / -1; }
 .cat { display: flex; align-items: center; gap: 7px; font: 600 13px -apple-system,
   "PingFang TC", sans-serif; margin-bottom: 8px; color: var(--ink); }
@@ -105,3 +108,17 @@ header .disclaimer { font-size: .82em; color: var(--ink2); margin: 2px 0 0; }
 .srow:last-child { border-bottom: none; }
 .go { margin-left: auto; color: var(--ink2); font-size: 1.2em; }
 header .disclaimer b { color: var(--warn); }
+
+/* 手機（診間用手機看匯出的單檔 HTML）：收窄邊距、總覽卡片單欄、
+   寬表格各自橫向捲動而非撐破整頁。App 內桌面檢視寬度 >600px 不會
+   觸發，兩邊互不影響。觸控目標沿用基礎樣式的 44px，不在此縮小。 */
+@media (max-width: 600px) {
+  body { padding: 11px; }
+  h1 { font-size: 22px; }
+  .cards { grid-template-columns: 1fr; }
+  /* 多欄表格（用藥／檢驗／就醫）改為獨立可橫捲區塊，欄內不換行，
+     避免窄螢幕擠壓文字 */
+  table { display: block; overflow-x: auto; white-space: nowrap;
+    -webkit-overflow-scrolling: touch; }
+  nav { gap: 6px; }
+}

@@ -84,6 +84,24 @@ jobs:
           projectPath: app
           tagName: v${{ needs.version-gate.outputs.version }}
           releaseName: "MyHealthBank v${{ needs.version-gate.outputs.version }}"
-          releaseBody: "安裝與放行說明見 README；變更明細見 CHANGELOG。產物未簽章。"
+          releaseBody: |
+            產物未簽章，首次開啟需手動放行。
+
+            - macOS：DMG 內附「使用說明（請先閱讀）.txt」，含放行與上手步驟；
+              或按住 Control 點 App 圖示 →「開啟」
+            - Windows：SmartScreen 出現時點「其他資訊」→「仍要執行」
+
+            完整說明見 README，變更明細見 CHANGELOG。
           releaseDraft: true
           prerelease: false
+      # DMG 內附使用說明：Tauri 的 bundle 設定無法附加任意檔案，改在建置後
+      # 後處理再覆蓋上傳（同一支腳本已在 app-build.yml 每次推 main 時實跑）
+      - name: DMG 內附使用說明並覆蓋上傳（僅 macOS）
+        if: matrix.platform == 'macos-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DMG="$(find app/src-tauri/target -maxdepth 5 -name '*.dmg' -print -quit)"
+          [ -n "$DMG" ] || { echo "::error::找不到 DMG 產物"; exit 1; }
+          bash scripts/dmg_add_readme.sh "$DMG"
+          gh release upload "v${{ needs.version-gate.outputs.version }}" "$DMG" --clobber

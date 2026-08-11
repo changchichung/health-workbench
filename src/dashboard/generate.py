@@ -35,8 +35,9 @@ def assemble(payload_json, sizes):
 <style>{css}</style>
 </head>
 <body>
-<div id="app"><p>載入中…若持續顯示此訊息，請改用瀏覽器（Safari、Chrome）開啟本檔；
-「檔案」App 等預覽視窗不會執行網頁程式，看不到內容。</p></div>
+<div id="app"><p>載入中…若一直停在這行，表示目前的開啟方式不會執行網頁程式
+（例如 iOS「檔案」App 的預覽視窗）。電腦上請用瀏覽器開啟本檔；iPhone、
+iPad 請改用「HTML &amp; Markdown 檢視器」這類會執行網頁程式的 App。</p></div>
 <script type="application/json" id="mhb-data">{payload_json}</script>
 <script>{vendor}</script>
 <script>{app_js}</script>

@@ -5,7 +5,8 @@ name: app-build
 on:
   push:
     branches: [main]
-    paths: ["app/**", "src/**", "tests/**", ".github/workflows/app-build.yml"]
+    paths: ["app/**", "src/**", "tests/**", "scripts/**", "packaging/**",
+            ".github/workflows/app-build.yml"]
   workflow_dispatch:
 
 jobs:
@@ -64,6 +65,14 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         with:
           projectPath: app
+      # 與 release.yml 同一支腳本：每次推 main 就在真實產物上實跑，
+      # 發布當天才第一次執行的腳本等於沒有防線
+      - name: DMG 內附使用說明（僅 macOS）
+        if: matrix.platform == 'macos-latest'
+        run: |
+          DMG="$(find app/src-tauri/target -maxdepth 5 -name '*.dmg' -print -quit)"
+          [ -n "$DMG" ] || { echo "::error::找不到 DMG 產物"; exit 1; }
+          bash scripts/dmg_add_readme.sh "$DMG"
       - name: 上傳安裝包
         uses: actions/upload-artifact@v4
         with:
