@@ -84,16 +84,33 @@ jobs:
           projectPath: app
           tagName: v${{ needs.version-gate.outputs.version }}
           releaseName: "MyHealthBank v${{ needs.version-gate.outputs.version }}"
+          # 放行步驟是「能不能跑起來」的關鍵，release 頁必須自帶完整版，
+          # 不要只寫「見 README」
           releaseBody: |
-            App 程式尚未經過簽章，首次開啟需手動放行。
+            ### 下載
 
-            - macOS：下載 `.dmg`。DMG 內附「使用說明（請先閱讀）.txt」，
-              放行與上手步驟都在裡面；或按住 Control 點 App 圖示 →「開啟」
-            - Windows：下載 `.msi` 或 `.exe`，使用說明請一併下載
-              `README-Windows.txt`（繁體中文）。SmartScreen 出現時點
-              「其他資訊」→「仍要執行」
+            - **macOS**：`MyHealthBank_${{ needs.version-gate.outputs.version }}_aarch64.dmg`（Apple Silicon）
+            - **Windows**：`MyHealthBank_${{ needs.version-gate.outputs.version }}_x64-setup.exe`
+              或 `MyHealthBank_${{ needs.version-gate.outputs.version }}_x64_en-US.msi`，
+              使用說明請一併下載 `README-Windows.txt`（繁體中文）
 
-            完整說明見 README，變更明細見 CHANGELOG。
+            ### 首次開啟（重要）
+
+            App 程式尚未經過簽章，首次開啟需手動放行：
+
+            - **macOS**：按住 Control 點 App 圖示 →「開啟」（或系統設定 →
+              隱私權與安全性 → 仍要開啟）；或在終端機執行一次
+              `xattr -cr /Applications/MyHealthBank.app`
+            - **Windows**：SmartScreen 出現時點「其他資訊」→「仍要執行」
+
+            DMG 內另附「使用說明（請先閱讀）.txt」，放行與上手步驟都在裡面。
+
+            也可自行建置：`cd app && npm ci && npx tauri build`（需先安裝 Rust）。
+
+            ### 其他
+
+            完整說明見 [README](https://github.com/notoriouslab/myhealthbank#readme)，
+            變更明細見 [CHANGELOG](https://github.com/notoriouslab/myhealthbank/blob/main/CHANGELOG.md)。
           releaseDraft: true
           prerelease: false
       # DMG 內附使用說明：Tauri 的 bundle 設定無法附加任意檔案，改在建置後
