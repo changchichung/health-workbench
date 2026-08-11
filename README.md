@@ -73,8 +73,8 @@ MyHealthBank 把兩邊的下載檔整理進同一個本機資料庫：每隔一�
 
 | 平台 | 下載 |
 |------|------|
-| **macOS** | `.dmg`（Apple Silicon／Intel） |
-| **Windows** | `.msi` 或 `.exe` |
+| **macOS** | `.dmg`（Apple Silicon；Intel 版後續提供） |
+| **Windows** | `.msi` 或 `.exe`（x64） |
 
 產物尚未經過簽章，首次開啟需手動放行：
 
