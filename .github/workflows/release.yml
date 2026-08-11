@@ -87,9 +87,11 @@ jobs:
           releaseBody: |
             產物未簽章，首次開啟需手動放行。
 
-            - macOS：DMG 內附「使用說明（請先閱讀）.txt」，含放行與上手步驟；
-              或按住 Control 點 App 圖示 →「開啟」
-            - Windows：SmartScreen 出現時點「其他資訊」→「仍要執行」
+            - macOS：下載 `.dmg`。DMG 內附「使用說明（請先閱讀）.txt」，
+              放行與上手步驟都在裡面；或按住 Control 點 App 圖示 →「開啟」
+            - Windows：下載 `.msi` 或 `.exe`，說明請一併下載
+              「使用說明-Windows.txt」。SmartScreen 出現時點
+              「其他資訊」→「仍要執行」
 
             完整說明見 README，變更明細見 CHANGELOG。
           releaseDraft: true
@@ -105,3 +107,13 @@ jobs:
           [ -n "$DMG" ] || { echo "::error::找不到 DMG 產物"; exit 1; }
           bash scripts/dmg_add_readme.sh "$DMG"
           gh release upload "v${{ needs.version-gate.outputs.version }}" "$DMG" --clobber
+      # Windows 安裝檔是單一執行檔，沒有可放說明的容器，改成獨立資產
+      # 掛在下載頁（macOS 使用者拿到的是 DMG 內附的那份）
+      - name: Windows 使用說明上傳為 release 資產（僅 Windows）
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp packaging/windows-readme.txt "使用說明-Windows.txt"
+          gh release upload "v${{ needs.version-gate.outputs.version }}" "使用說明-Windows.txt" --clobber

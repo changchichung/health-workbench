@@ -35,9 +35,13 @@ test("app/ 前端文案無禁用詞（引擎/知識模組全掃）", () => {
   assert.deepEqual(violations, []);
 });
 
-test("出貨文案無禁用詞（DMG 內附使用說明）", () => {
-  const p = path.join(REPO, "packaging/dmg-readme.txt");
-  const text = readFileSync(p, "utf-8");
-  assert.ok(text.length > 500, "說明檔內容異常偏少");
-  assert.deepEqual(checkText(text), []);
+test("出貨文案無禁用詞（DMG 與 Windows 使用說明）", () => {
+  const violations = [];
+  for (const rel of ["packaging/dmg-readme.txt", "packaging/windows-readme.txt"]) {
+    const text = readFileSync(path.join(REPO, rel), "utf-8");
+    assert.ok(text.length > 500, `${rel} 內容異常偏少`);
+    const hits = checkText(text);
+    if (hits.length) violations.push([rel, hits]);
+  }
+  assert.deepEqual(violations, []);
 });

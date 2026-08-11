@@ -20,8 +20,11 @@ macOS／Windows 桌面 App · 不需要帳號 · 檢視時不需要網路
 
 ---
 
-> 本工具僅協助整理、搜尋與視覺化你自行提供的健康資料，不提供診斷、
-> 治療、用藥或其他醫療判斷建議。如有醫療問題，請諮詢合格醫事人員。
+> ### 免責聲明
+> **本軟體僅進行個人健康資料的備份、匯整、搜尋與視覺化排版，不提供任何
+> 醫療診斷、治療、用藥或其他醫療判斷建議。** 資料可能不完整或有格式誤差，
+> 畫面上數值的意義請諮詢合格醫事人員。軟體全程本機運作，匯出的檔案含有
+> 完整個人醫療資料，請妥善保管，切勿隨意外傳。
 
 ## 這是什麼？
 
@@ -33,6 +36,54 @@ macOS／Windows 桌面 App · 不需要帳號 · 檢視時不需要網路
 打開 App 就是完整的健康儀表板：總覽、就醫時間軸、用藥清單（附成分
 與官方仿單連結）、檢驗趨勢，還有全文搜尋。要給家人或帶去診間，
 一鍵匯出單一 HTML 檔，電腦用瀏覽器直接開，手機平板用檢視器 App 開。
+
+## 核心特色
+
+- **資料留在自己家**：全程本機運作，不註冊、不上傳、不追蹤，檢視過程
+  零網路請求。想清空一切，刪掉一個資料夾就結束。
+- **突破三年視窗**：健康存摺只保留最近三年，逐次匯入就能無限期累積；
+  重複內容自動跳過，同一份檔案匯幾次都不會變亂。
+- **全家一台電腦**：成員新增、改名、刪除、資料改歸屬（匯錯人救得回來），
+  右上角一鍵切換看誰的資料。
+- **以藥品為核心的視角**：不只按看診日排列，還能按藥品聚合，看出長期
+  用藥的斷續與劑量變化。
+- **輕到不需要建置**：前端是 Preact + htm，原始碼直接入庫，沒有打包步驟，
+  改完 `app/src/` 的 JS 存檔就生效。
+
+## 畫面
+
+以下截圖使用合成的示範資料（人名、院所、診斷皆為虛構，藥品成分與仿單
+連結取自健保用藥品項開放資料）。這份示範資料可自行重現，也可以拿來
+試用 App：`node scripts/gen_demo_data.mjs`（產出示範資料庫與示範頁面）。
+
+### 總覽
+
+體重、血壓、日均步數與最近就診一眼看完，帶年度體重趨勢與最新檢驗快覽。
+
+![總覽](docs/screenshots/overview.png)
+
+### 就醫時間軸
+
+跨院所、跨年度的就醫歷史，依健保檔區分西醫門診、中醫門診、牙醫門診與
+藥局調劑。展開單筆可看主診斷、醫令與藥品成分、官方仿單連結、部分負擔
+與健保點數，並標注這筆資料來自哪一份匯入檔。
+
+![就醫時間軸](docs/screenshots/timeline.png)
+
+### 用藥
+
+以藥品為核心聚合，附成分與官方仿單連結。長條圖每根代表一次處方，
+高度是給藥日數，長期用藥的斷續與變化看得出來。
+
+![用藥](docs/screenshots/meds.png)
+
+### 檢驗趨勢
+
+跨院所的檢驗數據折線圖，灰帶是最近一次報告的參考值區間，方便對照
+數值落在哪裡。體重圖同時疊上 Apple 健康的每日中位數與健保成人健檢
+的量測點。檢驗項目附官方衛教說明與出處。
+
+![檢驗趨勢](docs/screenshots/trends.png)
 
 ## 快速上手（三步）
 
@@ -54,7 +105,7 @@ Safari 或 Chrome 直接開啟本機 HTML 檔案，而「檔案」App 的預覽�
 網頁程式，只會一直停在「載入中」。
 
 把檔案存進「檔案」App，再用
-[HTML & Markdown 檢視器](https://apps.apple.com/tw/app/html-markdown-%E6%AA%A2%E8%A6%96%E5%99%A8/id6782357972)
+[HTML & Markdown 檢視器](https://apps.apple.com/tw/app/id6782357972)
 這類 App 開啟即可正常顯示。電腦上（macOS、Windows）用瀏覽器直接開就行。
 
 ## 全家共用一台電腦
@@ -71,7 +122,8 @@ Safari 或 Chrome 直接開啟本機 HTML 檔案，而「檔案」App 的預覽�
 ## 隱私設計
 
 - 資料只存在你電腦的系統應用程式資料目錄（macOS：
-  `~/Library/Application Support/com.notoriouslab.myhealthbank/`），
+  `~/Library/Application Support/com.notoriouslab.myhealthbank/`；
+  Windows：`%APPDATA%\com.notoriouslab.myhealthbank\`），
   不上傳、不註冊、不追蹤。
 - 檢視過程零網路請求；只有點擊藥品仿單這類外部連結時才會開瀏覽器。
 - 匯出的儀表板檔名帶 `-private` 字樣、頁首有紅字提醒，內含全部
@@ -82,19 +134,47 @@ Safari 或 Chrome 直接開啟本機 HTML 檔案，而「檔案」App 的預覽�
 
 到 [Releases](https://github.com/notoriouslab/myhealthbank/releases) 下載對應平台的安裝包：
 
-| 平台 | 下載 |
-|------|------|
-| **macOS** | `.dmg`（Apple Silicon；Intel 版後續提供） |
-| **Windows** | `.msi` 或 `.exe`（x64） |
+| 平台 | 下載 | 開啟說明 |
+|------|------|---------|
+| **macOS** | `.dmg`（Apple Silicon；Intel 版後續提供） | DMG 內附「使用說明（請先閱讀）.txt」 |
+| **Windows** | `.msi` 或 `.exe`（x64） | 一併下載「使用說明-Windows.txt」 |
 
 產物尚未經過簽章，首次開啟需手動放行：
 
-- **macOS**：右鍵點 App →「開啟」（或系統設定 → 隱私權與安全性 → 仍要開啟）；
-  或在終端機執行一次 `xattr -cr /Applications/MyHealthBank.app`。
-  DMG 內附「使用說明（請先閱讀）.txt」，放行與上手步驟都在裡面。
+- **macOS**：按住 Control 點 App 圖示 →「開啟」（或系統設定 →
+  隱私權與安全性 → 仍要開啟）；或在終端機執行一次
+  `xattr -cr /Applications/MyHealthBank.app`
 - **Windows**：SmartScreen 出現時點「其他資訊」→「仍要執行」
 
-也可自行建置：`cd app && npm ci && npx tauri build`。
+也可自行建置：`cd app && npm ci && npx tauri build`（需先安裝 Rust）。
+
+## 參與開發
+
+本專案刻意不做醫療判斷、也不擴張功能邊界，協作重點集中在「資料對齊、
+整理與搜尋體驗」這三件事：
+
+1. **維護解析器**：健康存摺的格式會隨政策微調，需要讓解析保持彈性，
+   遇到沒見過的欄位不要整份匯入失敗。相容性回歸由 `tests/fixtures/`
+   的合成樣本與 Python 端逐位元組差分對帳把關。
+2. **補充檢驗項目知識庫**：`app/src/knowledge/labs.json` 目前收錄 40 項
+   常見檢驗的官方衛教說明與出處，歡迎擴充（每筆需附官方來源與引用日期）。
+3. **診間與手機閱讀體驗**：匯出檔已針對窄螢幕調整版面，但還沒有列印
+   樣式（`@media print`），長輩要印出來帶去診間的話這塊值得做。
+
+開發環境（macOS／Windows 皆可）：
+
+```bash
+git clone https://github.com/notoriouslab/myhealthbank.git
+cd myhealthbank/app
+npm ci          # 只裝 Tauri CLI，前端沒有依賴
+npx tauri dev   # 需先安裝 Rust 工具鏈
+```
+
+前端邏輯全在 `app/src/`，改完存檔即生效，沒有打包步驟。跑測試：
+`cd app && npm test`。
+
+送 PR 前請確認：測試全綠、不夾帶任何真實個人健康資料（`data/` 與
+App 資料目錄一律不進版本控制，測試只用合成樣本）。
 
 ---
 
@@ -107,11 +187,13 @@ Safari 或 Chrome 直接開啟本機 HTML 檔案，而「檔案」App 的預覽�
   `bin/mhb import <檔案>`、`bin/mhb rebuild`、`bin/mhb status`、
   `bin/mhb knowledge update`（更新藥品品項快取，唯一主動連網的命令）。
 - **測試**：`cd app && npm test`（132 項，含與 Python 的逐位元組
-  差分對帳、匯入與救援操作的非破壞性紅隊矩陣）；
+  差分對帳、匯入與救援操作的非破壞性紅隊矩陣、檢視器全分頁渲染守衛）；
   `python3 -m pytest tests/`；端到端 `scripts/e2e_idempotency.sh`。
-- **CI**：`.github/workflows/app-build.yml`（測試＋守衛 → 雙平台建置）。
+- **CI**：`.github/workflows/app-build.yml`（測試＋守衛 → 雙平台建置）；
+  `release.yml`（推 semver tag → 版本一致性關卡 → 全測試 → 雙平台
+  建置並發成 release 草稿，零長期密鑰）。
 - **規格**：`openspec/`（Spectra SDD，specs 為單一事實來源）；
   格式研究 `docs/20260808_phase0_findings.md`；`phase0/` 為已封存的
   探索原型。
 - **個資紀律**：`data/` 與 App 資料目錄一律不進版本控制；CI 只用
-  合成測試資料。
+  合成測試資料；README 截圖亦為合成資料。

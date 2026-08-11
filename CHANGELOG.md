@@ -30,7 +30,14 @@
   iOS 檢視器指引，不必先讀 GitHub 才會用；產出後掛載斷言說明檔與
   App 都在，同一支腳本在每次推 main 的 CI 就實跑
 - README：補 iPhone／iPad 開啟匯出檔的方式（iOS 無法用 Safari 直接
-  開本機 HTML）
+  開本機 HTML）、四個分頁的畫面截圖、核心特色與參與開發指引
+- DMG 說明檔圖示明確配位：原本交給 Finder 自動配位會落到視窗外
+  （實測使用者打開 DMG 沒看到），改為指定座標並放大視窗，產出後
+  斷言座標存在且落在可見範圍
+- Windows 使用說明（SmartScreen 放行、%APPDATA% 資料位置）以獨立
+  資產掛在 release 下載頁（安裝檔是單一執行檔，沒有可放說明的容器）
+- 新增 `scripts/gen_demo_data.mjs`：產生合成示範資料與示範頁面
+  （決定性輸出，README 截圖即由它產生；無真實個資，也可直接試用）
 - 零 schema 變更；Python CLI 維持凍結
 
 ## 0.4.0（2026-08-10）多人資料管理
