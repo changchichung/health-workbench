@@ -48,7 +48,8 @@ export function assemble(payload, assets) {
 <style>${assets.css}</style>
 </head>
 <body>
-<div id="app"><p>載入中…（需啟用 JavaScript）</p></div>
+<div id="app"><p>載入中…若持續顯示此訊息，請改用瀏覽器（Safari、Chrome）開啟本檔；
+「檔案」App 等預覽視窗不會執行網頁程式，看不到內容。</p></div>
 <script type="application/json" id="mhb-data">${toEmbeddedJson(payload)}</script>
 <script>${assets.vendor.join("\n")}</script>
 <script>${assets.appJs}</script>

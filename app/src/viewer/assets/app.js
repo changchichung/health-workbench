@@ -64,9 +64,11 @@
     return html`<span class="chip" style="background:${typeColor(type)}"></span>${fmtType(type)}`;
   }
 
-  /* SVG 折線圖：series = [{label, color, points:[[date,val],…]}]，可選 refRange=[lo,hi] */
+  /* SVG 折線圖：series = [{label, color, points:[[date,val],…]}]，可選 refRange=[lo,hi]。
+     空序列不畫（單一來源時常見：只有健保沒有 Apple、或反之），全空才顯示無資料。 */
   function LineChart({ series, unit, refRange }) {
-    const all = series.flatMap((s) => s.points);
+    const drawn = series.filter((s) => s.points.length);
+    const all = drawn.flatMap((s) => s.points);
     if (!all.length) return html`<p class="note">無資料</p>`;
     const dates = [...new Set(all.map((p) => p[0]))].sort();
     const vals = all.map((p) => p[1]);
@@ -89,7 +91,7 @@
         height=${Math.max(y(refRange[0]) - y(refRange[1]), 1)} class="refband" />` : null;
     return html`<div class="chartwrap"><svg viewBox="0 0 ${W} ${H}" width=${W} role="img">
       ${band}${grid}${xlab}
-      ${series.map((s) => {
+      ${drawn.map((s) => {
         const pts = s.points.map((p) => `${x(p[0])},${y(p[1])}`).join(" ");
         const last = s.points[s.points.length - 1];
         return html`<g>
@@ -433,6 +435,18 @@
   }
 
   /* ---------- App ---------- */
+  /* 錯誤邊界：單一分頁渲染拋錯只讓該頁顯示錯誤訊息，不拖垮整個 App
+     （key 隨分頁切換重建，換頁即重試）。 */
+  class Boundary extends preact.Component {
+    componentDidCatch(err) { this.setState({ err }); }
+    render() {
+      if (this.state.err) return html`<section><p class="note">
+        這個分頁載入失敗：${String(this.state.err)}。
+        可切換其他分頁繼續使用；若持續發生，請回報此訊息文字。</p></section>`;
+      return this.props.children;
+    }
+  }
+
   const TABS = [["overview", "總覽"], ["timeline", "就醫時間軸"], ["meds", "用藥"], ["trends", "趨勢"]];
   function App() {
     const [tab, setTab] = useState("overview");
@@ -459,7 +473,7 @@
             onInput=${(e) => setQ(e.target.value)} />
         </div>
       </header>
-      ${view}
+      <${Boundary} key=${"b" + tab + "|" + q.trim() + "|" + JSON.stringify(focus)}>${view}</${Boundary}>
     </div>`;
   }
 
