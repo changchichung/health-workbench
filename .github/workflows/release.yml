@@ -116,6 +116,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # 資產名稱必須是 ASCII：GitHub 會把 release 資產名的非 ASCII 字元
-          # 剝掉（2026-08-12 實測「使用說明-Windows.txt」變成「-Windows.txt」）
-          cp packaging/windows-readme.txt README-Windows.txt
+          # 剝掉（2026-08-12 實測「使用說明-Windows.txt」變成「-Windows.txt」）。
+          # 內容明確轉成 CRLF＋UTF-8 BOM，不依賴 runner 的 checkout 設定：
+          # 記事本等 Windows 內建工具沒有 BOM 時可能把繁中顯示成亂碼。
+          python3 - <<'PY'
+          src = open("packaging/windows-readme.txt", encoding="utf-8").read()
+          with open("README-Windows.txt", "w", encoding="utf-8-sig", newline="\r\n") as f:
+              f.write(src)
+          PY
           gh release upload "v${{ needs.version-gate.outputs.version }}" README-Windows.txt --clobber
