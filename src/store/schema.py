@@ -1,6 +1,73 @@
 """health-database schema：全表 profile_id、來源追溯、quality_flags、版本化。"""
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
+
+# CPAP 三表（v4 新增）：同時作為初始 DDL 與 3→4 遷移的單一來源，兩處手寫
+# 會漂移。與 app/src/store/schema.js 的 CPAP_DDL 逐字同步（schema parity
+# 測試比對兩邊空庫的 sqlite_master dump）。
+# 註：CPAP 匯入只在 App 端實作（Python CLI 功能凍結），但 DDL 同步不豁免。
+CPAP_DDL = """
+CREATE TABLE IF NOT EXISTS cpap_daily(
+    id INTEGER PRIMARY KEY,
+    profile_id INTEGER NOT NULL REFERENCES profiles(id),
+    doc_id INTEGER NOT NULL REFERENCES source_documents(id),
+    device TEXT NOT NULL,
+    summary_date TEXT NOT NULL,
+    session_start_min REAL,
+    session_end_min REAL,
+    session_count INTEGER,
+    usage_min REAL,
+    ahi REAL,
+    ai REAL,
+    hi REAL,
+    oai REAL,
+    cai REAL,
+    uai REAL,
+    leak_median REAL,
+    leak_95 REAL,
+    leak_max REAL,
+    pressure_median REAL,
+    pressure_95 REAL,
+    pressure_max REAL,
+    pressure_set REAL,
+    pressure_min_setting REAL,
+    pressure_max_setting REAL,
+    mode_raw REAL,
+    mask_events INTEGER,
+    extra_json TEXT,
+    quality_flags TEXT NOT NULL DEFAULT '',
+    UNIQUE(profile_id, device, summary_date));
+CREATE INDEX IF NOT EXISTS idx_cpap_daily_profile ON cpap_daily(profile_id, summary_date);
+
+CREATE TABLE IF NOT EXISTS cpap_events(
+    id INTEGER PRIMARY KEY,
+    profile_id INTEGER NOT NULL REFERENCES profiles(id),
+    doc_id INTEGER NOT NULL REFERENCES source_documents(id),
+    device TEXT NOT NULL,
+    session_date TEXT NOT NULL,
+    start_ts TEXT NOT NULL,
+    duration_sec REAL,
+    event_type TEXT NOT NULL,
+    quality_flags TEXT NOT NULL DEFAULT '',
+    UNIQUE(profile_id, device, start_ts, event_type));
+CREATE INDEX IF NOT EXISTS idx_cpap_events_profile ON cpap_events(profile_id, session_date);
+
+CREATE TABLE IF NOT EXISTS cpap_oximetry(
+    id INTEGER PRIMARY KEY,
+    profile_id INTEGER NOT NULL REFERENCES profiles(id),
+    doc_id INTEGER NOT NULL REFERENCES source_documents(id),
+    device TEXT NOT NULL,
+    session_date TEXT NOT NULL,
+    minute_ts TEXT NOT NULL,
+    spo2_min REAL,
+    spo2_mean REAL,
+    pulse_mean REAL,
+    pulse_max REAL,
+    sample_count INTEGER NOT NULL,
+    quality_flags TEXT NOT NULL DEFAULT '',
+    UNIQUE(profile_id, device, minute_ts));
+CREATE INDEX IF NOT EXISTS idx_cpap_oximetry_profile ON cpap_oximetry(profile_id, session_date);
+"""
 
 DDL = """
 CREATE TABLE IF NOT EXISTS schema_version(
@@ -175,13 +242,15 @@ CREATE TABLE IF NOT EXISTS apple_workouts(
     source_name TEXT,
     quality_flags TEXT NOT NULL DEFAULT '',
     UNIQUE(profile_id, activity, start_ts, end_ts, source_name));
-"""
+""" + CPAP_DDL
 
-# 前向遷移：{來源版本: [SQL, ...]}，逐版執行至 SCHEMA_VERSION
+# 前向遷移：{來源版本: [SQL, ...]}，逐版執行至 SCHEMA_VERSION。
+# 每個元素 MUST 為單一語句（db.py 逐句 cur.execute，不走 executescript）。
 MIGRATIONS = {
     1: ["ALTER TABLE source_documents ADD COLUMN import_stats TEXT"],
     2: ["CREATE INDEX IF NOT EXISTS idx_medications_profile"
         " ON medications(profile_id, encounter_id)"],
+    3: [s.strip() for s in CPAP_DDL.split(";") if s.strip()],
 }
 
 # 帶指紋合併語意的健保紀錄表（碰撞防禦與 superseded 偵測作用對象）

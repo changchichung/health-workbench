@@ -29,6 +29,36 @@ export async function inspectDbVersion(driver, supportedVersion) {
   return classifyVersion(v, supportedVersion);
 }
 
+// 讀既有 schema 版本；schema_version 表不存在（全新庫）回 null。
+export async function readSchemaVersion(driver) {
+  const rows = await driver.select(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'");
+  if (rows.length === 0) return null;
+  const [{ v }] = await driver.select("SELECT MAX(version) v FROM schema_version");
+  return v ?? null;
+}
+
+// 純函式：是否需要遷移前快照（cpap-sleep-therapy design D8）。
+// 全新庫（null）不做；已是最新或更新的版本不做。
+export function needsPreMigrationSnapshot(existingVersion, supportedVersion) {
+  return existingVersion != null && existingVersion < supportedVersion;
+}
+
+// 純函式：遷移前快照檔名。帶來源版本與日期，同名時附序號
+// （VACUUM INTO 對已存在的目標檔直接拒絕，故呼叫端 MUST 先以 exists 預檢）。
+// 版本與序號一律轉為非負整數後才進檔名：這兩個值最終會組進檔案路徑，而
+// version 來自資料庫欄位（SQLite 的型別親和性允許 INTEGER 欄位實際存字串），
+// 不強制數值化就等於讓資料庫內容決定路徑字串。
+export function preMigrationSnapshotName(fromVersion, isoDate, seq = 0) {
+  const v = Math.trunc(Number(fromVersion));
+  const n = Math.trunc(Number(seq));
+  if (!Number.isFinite(v) || v < 0) throw new Error("快照檔名：來源版本非有效整數");
+  if (!Number.isFinite(n) || n < 0) throw new Error("快照檔名：序號非有效整數");
+  const d = String(isoDate).replaceAll("-", "");
+  if (!/^\d{8}$/.test(d)) throw new Error("快照檔名：日期需為 YYYY-MM-DD");
+  return `mhb-premigrate-v${v}-${d}${n ? `-${n}` : ""}.sqlite`;
+}
+
 // 純函式：版本分類（node:test 直測）
 export function classifyVersion(version, supportedVersion) {
   if (version == null) return { ok: false, reason: "not_mhb_db" };

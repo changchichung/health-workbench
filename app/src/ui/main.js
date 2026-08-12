@@ -4,7 +4,8 @@
 // 事實來源，檢視相關介面（狀態列/檢視頁）跟當前成員，匯入紀錄卡全庫。
 import { TauriDriver } from "../store/tauri_driver.js";
 import { initSchema, SCHEMA_VERSION } from "../store/schema.js";
-import { resolveDbPath, importExistingDb, backupFileName, exportDbSnapshot }
+import { resolveDbPath, importExistingDb, backupFileName, exportDbSnapshot,
+  readSchemaVersion, needsPreMigrationSnapshot, preMigrationSnapshotName }
   from "../store/location.js";
 import { loadSettings, saveSettings, resolveCurrentProfile } from "../store/settings.js";
 import { listProfiles } from "../engine/profiles.js";
@@ -130,13 +131,44 @@ async function rememberDialogDir(kind, usedPath) {
     kind === "export" ? { last_export_dir: dir } : { last_open_dir: dir });
 }
 
+// 遷移前自動快照 → 遷移（cpap-sleep-therapy design D8）。
+// 用 exportDbSnapshot（VACUUM INTO）而非 fs.copyFile：複製前必須先關閉主庫
+// 連線（連線池握檔陷阱，見 g3_task0.md），而遷移正發生在開庫流程中，庫必然
+// 開著。VACUUM INTO 取單一交易視角、不中斷主庫，且輸出可被 importExistingDb
+// 讀回。快照失敗 MUST 中止遷移，不得靜默續行（失敗代價是資料庫打不開）。
+async function migrateWithSnapshot() {
+  const fs = window.__TAURI__.fs;
+  const from = await readSchemaVersion(app.driver);
+  if (needsPreMigrationSnapshot(from, SCHEMA_VERSION)) {
+    const sep = app.dbDir.includes("\\") ? "\\" : "/";
+    const today = localDateISO();
+    let dest = null;
+    for (let seq = 0; seq < 100; seq += 1) {
+      const cand = `${app.dbDir}${sep}${preMigrationSnapshotName(from, today, seq)}`;
+      if (!(await fs.exists(cand))) { dest = cand; break; }
+    }
+    if (!dest) {
+      throw new Error("升級資料庫前的自動備份無法命名（同日備份過多），"
+        + "為保護既有資料已停止升級，請先整理資料目錄內的 mhb-premigrate-* 檔案。");
+    }
+    try {
+      await exportDbSnapshot(app.driver, dest);
+    } catch (err) {
+      throw new Error(`升級資料庫前的自動備份失敗（磁碟空間或權限不足），`
+        + `為保護既有資料已停止升級。備份目標：${dest}（${err?.message || err}）`);
+    }
+    app.preMigrateSnapshot = dest;
+  }
+  return initSchema(app.driver);
+}
+
 async function boot() {
   const { path, overridden } = await resolveDbPath();
   app.dbPath = path;
   app.dbDir = path.replace(/[/\\][^/\\]+$/, "");
   await window.__TAURI__.fs.mkdir(app.dbDir, { recursive: true }).catch(() => {});
   app.driver = await TauriDriver.open(path);
-  await initSchema(app.driver);
+  await migrateWithSnapshot();
   const profiles = await listProfiles(app.driver);
   app.currentProfileId = resolveCurrentProfile(
     await loadSettings(app.dbDir), profiles);
@@ -162,7 +194,8 @@ async function importExisting(srcPath) {
     return r;
   } finally {
     app.driver = await TauriDriver.open(app.dbPath);
-    await initSchema(app.driver);
+    // 匯入的舊庫同樣可能需要遷移，走同一條「先快照再遷移」的路徑
+    await migrateWithSnapshot();
     if (app.flow) await setCurrentProfile(app.currentProfileId).catch(() => {});
   }
 }

@@ -30,12 +30,17 @@ test("schema parity：JS 與 Python 空庫 schema dump 全等", async () => {
   assert.deepEqual(norm(jsRows), norm(pyRows));
 });
 
-test("前向遷移：v2 庫開啟自動升 v3（補 idx_medications_profile）", async () => {
+test("前向遷移：v2 庫開啟自動逐版升至最新（補索引與 CPAP 三表）", async () => {
   const d = new NodeDriver();
   await initSchema(d);
-  // 構造 v2 現場：移除 migration 2 的產物與版本紀錄
+  // 構造 v2 現場：移除 migration 2 與 3 的產物，版本紀錄清空後只留 2。
+  // 版本紀錄 MUST 全清（DELETE 特定版本號會隨 SCHEMA_VERSION 演進而失效，
+  // 導致 MAX(version) 仍是最新值、遷移根本不被觸發而測試假綠）
   await d.execute("DROP INDEX idx_medications_profile");
-  await d.execute("DELETE FROM schema_version WHERE version = 3");
+  for (const t of ["cpap_daily", "cpap_events", "cpap_oximetry"]) {
+    await d.execute(`DROP TABLE ${t}`);
+  }
+  await d.execute("DELETE FROM schema_version");
   await d.execute("INSERT INTO schema_version(version) VALUES (2)");
 
   const ver = await initSchema(d);
@@ -43,8 +48,12 @@ test("前向遷移：v2 庫開啟自動升 v3（補 idx_medications_profile）",
   const idx = await d.select(
     "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_medications_profile'");
   assert.equal(idx.length, 1);
+  const tables = await d.select(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'cpap_%' ORDER BY name");
+  assert.deepEqual(tables.map(r => r.name),
+    ["cpap_daily", "cpap_events", "cpap_oximetry"]);
   const [{ v }] = await d.select("SELECT MAX(version) v FROM schema_version");
-  assert.equal(v, 3);
+  assert.equal(v, SCHEMA_VERSION);
   await d.close();
 });
 

@@ -14,7 +14,8 @@ import { backupFileName, exportDbSnapshot } from "../../src/store/location.js";
 
 const TABLES = ["profiles", "source_documents", "encounters", "medications",
   "lab_results", "reports", "immunizations", "body_measurements",
-  "cancer_screenings", "apple_records", "apple_workouts"];
+  "cancer_screenings", "apple_records", "apple_workouts",
+  "cpap_daily", "cpap_events", "cpap_oximetry"];
 
 async function seed(d) {
   const p = await createProfile(d, "本人");
