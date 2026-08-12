@@ -13,7 +13,50 @@ const MEASURE_TYPES = ["體重", "BMI", "體脂率", "收縮壓", "舒張壓", "
 
 const TABLES = ["profiles", "source_documents", "encounters", "medications",
   "lab_results", "reports", "immunizations", "body_measurements",
-  "cancer_screenings", "apple_records", "apple_workouts"];
+  "cancer_screenings", "apple_records", "apple_workouts",
+  "cpap_daily", "cpap_events", "cpap_oximetry"];
+
+// CPAP 逐筆事件的 payload 上限。Phase 1 實測不足三百筆，但 Phase 2 帶進
+// 數年資料後可能上萬，而 payload 會嵌進單檔 HTML。超過時只帶最近的，
+// 並在 meta 標明被截斷（UI MUST 據此顯示「僅列最近 N 筆」，不可靜默截斷）。
+const CPAP_EVENT_LIMIT = 2000;
+
+// CPAP 區塊（design D10）。逐分鐘血氧不進 payload：Phase 1 沒有資料，
+// Phase 2 帶進數年逐分鐘會是數十萬列。改帶每晚彙總，趨勢圖要的正是這個。
+async function cpapBlock(driver, profileId) {
+  const daily = await driver.select(`
+    SELECT summary_date AS date, device, ahi, ai, hi, oai, cai, uai,
+           usage_min, leak_95, pressure_95,
+           session_start_min, session_end_min, session_count, quality_flags
+    FROM cpap_daily WHERE profile_id=? ORDER BY summary_date`, [profileId]);
+  const eventDaily = await driver.select(`
+    SELECT session_date AS date, event_type, COUNT(*) AS n
+    FROM cpap_events WHERE profile_id=?
+    GROUP BY session_date, event_type ORDER BY session_date, event_type`, [profileId]);
+  const [{ total }] = await driver.select(
+    "SELECT COUNT(*) AS total FROM cpap_events WHERE profile_id=?", [profileId]);
+  const events = await driver.select(`
+    SELECT session_date, start_ts, duration_sec, event_type
+    FROM cpap_events WHERE profile_id=?
+    ORDER BY start_ts DESC LIMIT ?`, [profileId, CPAP_EVENT_LIMIT]);
+  // 每晚彙總：整晚最低血氧與平均，供跨日趨勢。以 SQL 的 ROUND 計算而非
+  // 在兩種語言各自實作四捨五入（provider_parity 是全等比對）。
+  const oximetry = await driver.select(`
+    SELECT session_date AS date,
+           MIN(spo2_min) AS spo2_min, ROUND(AVG(spo2_mean), 1) AS spo2_mean,
+           ROUND(AVG(pulse_mean), 1) AS pulse_mean, MAX(pulse_max) AS pulse_max,
+           SUM(sample_count) AS samples
+    FROM cpap_oximetry WHERE profile_id=?
+    GROUP BY session_date ORDER BY session_date`, [profileId]);
+  return {
+    daily: daily.map(r => ({ ...r })),
+    event_daily: eventDaily.map(r => ({ ...r })),
+    events: events.map(r => ({ ...r })).reverse(),
+    events_total: total,
+    events_truncated: total > CPAP_EVENT_LIMIT,
+    oximetry: oximetry.map(r => ({ ...r })),
+  };
+}
 
 // Python round() 等價：round-half-even（銀行家捨入）
 export function pyRound(v, digits) {
@@ -150,6 +193,8 @@ export async function buildPayload(driver, { profileId, knowledgeEntries,
     + " FROM source_documents WHERE profile_id=? ORDER BY imported_at",
     [profileId])).map(r => ({ ...r }));
 
+  const cpap = await cpapBlock(driver, profileId);
+
   return {
     meta: {
       generated_at: today,
@@ -170,5 +215,6 @@ export async function buildPayload(driver, { profileId, knowledgeEntries,
     activity,
     measures,
     workouts,
+    cpap,
   };
 }

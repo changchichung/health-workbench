@@ -42,6 +42,10 @@ def daily_measure_series(store, type_zh):
     return [[d, round(sorted(vs)[len(vs) // 2], 2)] for d, vs in sorted(buckets.items())]
 
 
+# 與 app/src/provider/payload.js 的 CPAP_EVENT_LIMIT 同值
+CPAP_EVENT_LIMIT = 2000
+
+
 def build_payload(store, db_path):
     """組出 dashboard 嵌入資料。回傳 (payload dict, 各層體積 bytes)。"""
     con = store.con
@@ -101,6 +105,38 @@ def build_payload(store, db_path):
         SELECT activity, substr(start_ts,1,10) AS date, duration_min, source_name
         FROM apple_workouts ORDER BY start_ts DESC""")]
 
+    # --- CPAP 層（design D10）---
+    # 逐分鐘血氧不進 payload：Phase 2 帶進數年逐分鐘會是數十萬列。改帶每晚
+    # 彙總，趨勢圖要的正是這個。與 app/src/provider/payload.js 的 cpapBlock
+    # 逐句對應（provider_parity 是全等比對）。
+    cpap_daily = [dict(r) for r in con.execute("""
+        SELECT summary_date AS date, device, ahi, ai, hi, oai, cai, uai,
+               usage_min, leak_95, pressure_95,
+               session_start_min, session_end_min, session_count, quality_flags
+        FROM cpap_daily ORDER BY summary_date""")]
+    cpap_event_daily = [dict(r) for r in con.execute("""
+        SELECT session_date AS date, event_type, COUNT(*) AS n
+        FROM cpap_events GROUP BY session_date, event_type
+        ORDER BY session_date, event_type""")]
+    cpap_events_total = con.execute("SELECT COUNT(*) FROM cpap_events").fetchone()[0]
+    cpap_events = [dict(r) for r in con.execute("""
+        SELECT session_date, start_ts, duration_sec, event_type
+        FROM cpap_events ORDER BY start_ts DESC LIMIT ?""", (CPAP_EVENT_LIMIT,))]
+    cpap_oximetry = [dict(r) for r in con.execute("""
+        SELECT session_date AS date,
+               MIN(spo2_min) AS spo2_min, ROUND(AVG(spo2_mean), 1) AS spo2_mean,
+               ROUND(AVG(pulse_mean), 1) AS pulse_mean, MAX(pulse_max) AS pulse_max,
+               SUM(sample_count) AS samples
+        FROM cpap_oximetry GROUP BY session_date ORDER BY session_date""")]
+    cpap = {
+        "daily": cpap_daily,
+        "event_daily": cpap_event_daily,
+        "events": list(reversed(cpap_events)),
+        "events_total": cpap_events_total,
+        "events_truncated": cpap_events_total > CPAP_EVENT_LIMIT,
+        "oximetry": cpap_oximetry,
+    }
+
     date_min, date_max = con.execute(
         "SELECT MIN(date), MAX(date) FROM encounters").fetchone()
     payload = {
@@ -125,6 +161,7 @@ def build_payload(store, db_path):
         "activity": activity,
         "measures": measures,
         "workouts": workouts,
+        "cpap": cpap,
     }
 
     sizes = {}

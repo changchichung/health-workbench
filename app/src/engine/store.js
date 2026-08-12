@@ -114,7 +114,8 @@ export class EngineStore {
     const out = {};
     for (const t of ["profiles", "source_documents", "encounters", "medications",
       "lab_results", "reports", "immunizations", "body_measurements",
-      "cancer_screenings", "apple_records", "apple_workouts"]) {
+      "cancer_screenings", "apple_records", "apple_workouts",
+      "cpap_daily", "cpap_events", "cpap_oximetry"]) {
       const [{ c }] = await this.driver.select(`SELECT COUNT(*) c FROM ${t}`);
       out[t] = c;
     }

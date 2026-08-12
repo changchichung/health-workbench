@@ -257,4 +257,5 @@ MIGRATIONS = {
 FP_TABLES = ["encounters", "lab_results", "reports", "immunizations",
              "body_measurements", "cancer_screenings"]
 ALL_TABLES = ["profiles", "source_documents", "medications",
-              "apple_records", "apple_workouts"] + FP_TABLES
+              "apple_records", "apple_workouts",
+              "cpap_daily", "cpap_events", "cpap_oximetry"] + FP_TABLES

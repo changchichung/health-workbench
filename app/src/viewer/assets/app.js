@@ -3,6 +3,17 @@
 (function () {
   "use strict";
   const DATA = JSON.parse(document.getElementById("mhb-data").textContent);
+
+  /* ---------- CPAP（睡眠呼吸） ---------- */
+  // payload 可能來自尚無 CPAP 區塊的舊版本，一律防禦性取值
+  const CPAP = DATA.cpap || {};
+  const CPAP_DAILY = CPAP.daily || [];
+  const HAS_CPAP = CPAP_DAILY.length > 0;
+  // 沒有 CPAP 資料的使用者不該看到空分頁與空卡片（proposal 相容性要求），
+  // 因此分頁、總覽卡與趨勢圖都以 HAS_CPAP 為條件顯示
+  const cpapSeries = (field) => CPAP_DAILY
+    .filter((r) => r[field] != null).map((r) => [r.date, r[field]]);
+
   // 視窗/分頁標題帶成員名（2026-08-10 走查回饋：多成員一目瞭然）
   if (DATA.meta.profile) document.title = DATA.meta.profile + " 的個人健康資料工作台（私人）";
   const { h, render } = preact;
@@ -254,22 +265,62 @@
 
   const STAT_ZH = { encounters: "就醫", medications: "用藥", lab_results: "檢驗",
     reports: "報告", immunizations: "疫苗", body_measurements: "身體數值",
-    cancer_screenings: "癌篩", apple_records: "量測", apple_workouts: "運動" };
+    cancer_screenings: "癌篩", apple_records: "量測", apple_workouts: "運動",
+    cpap_daily: "睡眠每日摘要", cpap_events: "呼吸事件", cpap_oximetry: "睡眠血氧",
+    cpap_daily_unused: "無使用紀錄的日子" };
 
-  function importSummary(statsJson) {
-    if (!statsJson) return "（早期匯入，無統計）";
+  // 單筆 import_stats（JSON 字串）→ { inserted, dupTotal }；不可解析回 null
+  function parseStats(statsJson) {
+    if (!statsJson) return null;
     try {
       const st = JSON.parse(statsJson);
-      const parts = Object.entries(st.inserted || {})
-        .filter(([, n]) => n > 0)
-        .map(([k, n]) => `${STAT_ZH[k] || k} +${n.toLocaleString()}`);
-      const dup = Object.values(st.skipped_dup || {}).reduce((a, b) => a + b, 0);
-      if (dup) parts.push(`重複略過 ${dup.toLocaleString()}`);
-      return parts.join("、") || "無新增（內容均已存在）";
-    } catch (e) { return "—"; }
+      return {
+        inserted: st.inserted || {},
+        dupTotal: Object.values(st.skipped_dup || {}).reduce((a, b) => a + b, 0),
+      };
+    } catch (e) { return null; }
+  }
+
+  // 接受 groupSources 合計後的物件（單檔來源即該檔自身的統計）
+  function importSummary(stats) {
+    if (!stats || stats.missing) return "（早期匯入，無統計）";
+    const parts = Object.entries(stats.inserted || {})
+      .filter(([, n]) => n > 0)
+      .map(([k, n]) => `${STAT_ZH[k] || k} +${n.toLocaleString()}`);
+    if (stats.dupTotal) parts.push(`重複略過 ${stats.dupTotal.toLocaleString()}`);
+    return parts.join("、") || "無新增（內容均已存在）";
   }
 
   /* ---------- 總覽（洞察式摘要卡） ---------- */
+  const ADAPTER_ZH = {
+    nhi_json: "健保存摺（JSON）", nhi_xml: "健保存摺（XML）",
+    apple_health: "Apple 健康", resmed_edf: "CPAP（ResMed）",
+  };
+
+  // 同一 adapter 且同一匯入時刻的多個檔併為一組（design D2：payload 保留
+  // 逐檔追溯，摺疊做在檢視層）。stats 取組內各檔的合計。
+  function groupSources(sources) {
+    const out = [];
+    const idx = new Map();
+    for (const s of sources || []) {
+      const key = `${s.adapter}|${s.imported_at}`;
+      if (!idx.has(key)) {
+        idx.set(key, out.length);
+        out.push({ adapter: s.adapter, imported_at: s.imported_at, files: [], stats: {} });
+      }
+      const g = out[idx.get(key)];
+      g.files.push(s);
+      const st = parseStats(s.import_stats);
+      if (!st) { g.stats.missing = true; continue; }
+      g.stats.inserted = g.stats.inserted || {};
+      for (const [k, v] of Object.entries(st.inserted)) {
+        g.stats.inserted[k] = (g.stats.inserted[k] || 0) + v;
+      }
+      g.stats.dupTotal = (g.stats.dupTotal || 0) + st.dupTotal;
+    }
+    return out;
+  }
+
   function Overview({ go }) {
     const c = DATA.meta.counts;
     const encs = DATA.encounters.slice(0, 8);
@@ -281,6 +332,7 @@
     const latest = DATA.encounters[0];
     const weightYear = (DATA.measures["體重"] || []).slice(-365);
     const recentLabs = DATA.labs.filter((l) => l.value_numeric != null).slice(-4).reverse();
+    const lastNight = HAS_CPAP ? CPAP_DAILY.at(-1) : null;
     return html`<section>
       <div class="cards">
         <${Card} icon="⚖︎" color="var(--s1)" title="體重">
@@ -293,6 +345,13 @@
             <div class="delta flat">mmHg｜${(DATA.measures["收縮壓"] || []).at(-1)?.[0] || ""}</div>`
             : html`<p class="note">尚無量測資料</p>`}
         </${Card}>
+        ${lastNight && html`<${Card} icon="😴" color="var(--s3)" title="睡眠呼吸（最近一晚）">
+          <div class="big">${lastNight.ahi ?? "—"}<small> AHI</small></div>
+          <div class="delta flat">
+            ${lastNight.usage_min != null
+              ? `使用 ${Math.round((lastNight.usage_min / 60) * 10) / 10} 小時` : "使用時數不明"}
+            ｜${lastNight.date}</div>
+        </${Card}>`}
         <${Card} icon="🏃" color="var(--s4)" title="日均步數（30日）">
           ${steps30 != null ? html`<div class="big">${steps30.toLocaleString()}</div>
             <${Delta} d=${stepsPrev != null ? steps30 - stepsPrev : null} unit=" 較前期" invert=${true} />`
@@ -322,13 +381,16 @@
         </${Card}>
         <${Card} wide icon="🗂" color="var(--ink2)" title="資料庫與匯入紀錄">
           <p class="note">就醫 ${c.encounters}｜用藥 ${c.medications}｜檢驗 ${c.lab_results}｜
-            報告 ${c.reports}｜疫苗 ${c.immunizations}｜Apple 量測 ${c.apple_records.toLocaleString()}</p>
+            報告 ${c.reports}｜疫苗 ${c.immunizations}｜Apple 量測 ${c.apple_records.toLocaleString()}
+            ${HAS_CPAP ? `｜睡眠呼吸 ${c.cpap_daily} 晚` : ""}</p>
           <table><tr><th>匯入時間</th><th>檔案</th><th>來源</th><th>新增內容</th></tr>
-            ${DATA.meta.sources.map((s) => html`<tr>
-              <td class="dt">${s.imported_at}</td><td>${s.filename}</td>
-              <td class="dt">${({ nhi_json: "健保存摺（JSON）", nhi_xml: "健保存摺（XML）",
-                apple_health: "Apple 健康" })[s.adapter] || s.adapter}</td>
-              <td class="dt">${importSummary(s.import_stats)}</td></tr>`)}</table>
+            ${groupSources(DATA.meta.sources).map((g) => html`<tr>
+              <td class="dt">${g.imported_at}</td>
+              <td>${g.files.length === 1 ? g.files[0].filename
+                : html`<details><summary>${g.files.length} 個檔案</summary>
+                    ${g.files.map((f) => html`<div class="dt">${f.filename}</div>`)}</details>`}</td>
+              <td class="dt">${ADAPTER_ZH[g.adapter] || g.adapter}</td>
+              <td class="dt">${importSummary(g.stats)}</td></tr>`)}</table>
         </${Card}>
       </div>
     </section>`;
@@ -466,6 +528,8 @@
   function trendBounds() {
     const groups = [
       DATA.measures["體重"] || [],
+      // CPAP 日期要納入共用時間域，否則新圖的 x 軸與同頁其他圖不一致
+      cpapSeries("ahi"),
       DATA.nhi_body.filter((b) => b.weight_kg).map((b) => [b.check_date, b.weight_kg]),
       DATA.measures["收縮壓"] || [],
       DATA.measures["舒張壓"] || [],
@@ -549,12 +613,91 @@
       <${LineChart} unit="kg" series=${weightSeries} domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel} />
       <h2>血壓（每日中位數）</h2>
       <${LineChart} unit="mmHg" series=${bpSeries} domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel} />
+      ${HAS_CPAP && html`<h2>每晚 AHI（睡眠呼吸）</h2>
+        <${LineChart} unit="次/小時" domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel}
+          note="日期為入睡當晚；與上方體重圖共用同一時間區間，可直接同期對照"
+          series=${[{ label: "AHI", color: "var(--s3)", points: cpapSeries("ahi") }]} />`}
       <h2>日均步數（每日單一來源最大值）</h2>
       <${LineChart} unit="步" domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel}
         note=${range === "3m" ? "逐日" : "月平均"}
         series=${[{ label: "日均步數", color: "var(--s1)",
           points: range === "3m" ? (DATA.activity["步數"] || [])
             : monthlyAvg(DATA.activity["步數"] || []) }]} />
+    </section>`;
+  }
+
+  /* ---------- 睡眠呼吸分頁 ---------- */
+  // 只顯示不解讀：不對 AHI 等指標下任何判定性描述（假設 #66）
+  function Sleep() {
+    const { today, latest, earliest } = useMemo(trendBounds, []);
+    const [range, setRange] = useState(() => defaultRange(today, latest));
+    const [breakdown, setBreakdown] = useState(false);
+    const dom = rangeDomain(range, today, earliest);
+    const showAll = range === "all" ? null : () => setRange("all");
+    const rangeLabel = (RANGES.find(([k]) => k === range) || [])[1];
+
+    const ahiSeries = [{ label: "AHI", color: "var(--s3)", points: cpapSeries("ahi") }];
+    if (breakdown) {
+      ahiSeries.push(
+        { label: "阻塞", color: "var(--s1)", points: cpapSeries("oai") },
+        { label: "中樞", color: "var(--s2)", points: cpapSeries("cai") },
+        { label: "低通氣", color: "var(--s4)", points: cpapSeries("hi") });
+    }
+    const oxi = CPAP.oximetry || [];
+    const events = CPAP.events || [];
+    const devices = [...new Set(CPAP_DAILY.map((r) => r.device))].filter(Boolean);
+    const nights = CPAP_DAILY.length;
+    const usageSeries = [{ label: "使用時數", color: "var(--s1)",
+      points: CPAP_DAILY.filter((r) => r.usage_min != null)
+        .map((r) => [r.date, Math.round((r.usage_min / 60) * 10) / 10]) }];
+
+    return html`<section>
+      <div class="filters">
+        ${RANGES.map(([k, label]) => html`<button class="catbtn ${range === k ? "on" : ""}"
+          onClick=${() => setRange(k)}>${label}</button>`)}
+        <span class="note">有紀錄的夜晚 ${nights} 晚${devices.length ? `｜機型 ${devices.join("、")}` : ""}</span>
+      </div>
+      <h2>每晚 AHI</h2>
+      <div class="filters">
+        <button class="catbtn ${breakdown ? "on" : ""}"
+          onClick=${() => setBreakdown(!breakdown)}>顯示分項（阻塞／中樞／低通氣）</button>
+      </div>
+      <${LineChart} unit="次/小時" series=${ahiSeries} domain=${dom}
+        onShowAll=${showAll} rangeLabel=${rangeLabel}
+        note="日期為入睡當晚（一個治療夜自正午起算）" />
+      <h2>使用時數</h2>
+      <${LineChart} unit="小時" series=${usageSeries} domain=${dom}
+        onShowAll=${showAll} rangeLabel=${rangeLabel}
+        note="未使用機器的日子不列入，不畫成 0" />
+      <h2>漏氣（95 百分位）</h2>
+      <${LineChart} unit="L/s" domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel}
+        series=${[{ label: "漏氣", color: "var(--s2)", points: cpapSeries("leak_95") }]} />
+      <h2>治療壓力（95 百分位）</h2>
+      ${/* 與漏氣分成兩張圖而非疊在一起：兩者單位與數量級都不同（漏氣約
+           0-1 L/s、壓力約 6-8 cmH2O），LineChart 只有單一 y 軸，疊在一起
+           會把漏氣線壓成貼底的平線。同 design D10 否決雙軸圖的理由。 */""}
+      <${LineChart} unit="cmH2O" domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel}
+        series=${[{ label: "壓力", color: "var(--s4)", points: cpapSeries("pressure_95") }]} />
+      <h2>睡眠期血氧</h2>
+      ${oxi.length
+        ? html`<${LineChart} unit="%" domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel}
+            note="每晚一點：整晚最低與平均"
+            series=${[
+              { label: "最低", color: "var(--s2)", points: oxi.map((r) => [r.date, r.spo2_min]) },
+              { label: "平均", color: "var(--s1)", points: oxi.map((r) => [r.date, r.spo2_mean]) },
+            ]} />`
+        : html`<p class="note">此來源沒有血氧資料。血氧需要機器外接血氧模組才會記錄。</p>`}
+      <h2>呼吸事件${CPAP.events_truncated ? `（共 ${CPAP.events_total} 筆，以下列最近 ${events.length} 筆）` : `（${events.length} 筆）`}</h2>
+      ${events.length
+        ? html`<table><tr><th>入睡日</th><th>時刻</th><th>類型</th><th>持續</th></tr>
+            ${events.slice().reverse().slice(0, 300).map((e) => html`<tr>
+              <td class="dt">${e.session_date}</td>
+              <td class="dt">${(e.start_ts || "").slice(11, 19)}</td>
+              <td>${e.event_type}</td>
+              <td class="num">${e.duration_sec != null ? `${e.duration_sec} 秒` : "—"}</td></tr>`)}
+          </table>
+          ${events.length > 300 && html`<p class="note">表格僅列最近 300 筆，圖表仍涵蓋全部區間。</p>`}`
+        : html`<p class="note">此來源沒有逐次事件紀錄（僅有每日摘要）。</p>`}
     </section>`;
   }
 
@@ -621,7 +764,8 @@
     }
   }
 
-  const TABS = [["overview", "總覽"], ["timeline", "就醫時間軸"], ["meds", "用藥"], ["trends", "趨勢"]];
+  const TABS = [["overview", "總覽"], ["timeline", "就醫時間軸"], ["meds", "用藥"],
+    ["trends", "趨勢"], ...(HAS_CPAP ? [["sleep", "睡眠呼吸"]] : [])];
   function App() {
     const [tab, setTab] = useState("overview");
     const [focus, setFocus] = useState(null);
@@ -631,6 +775,7 @@
       : tab === "overview" ? html`<${Overview} go=${go} />`
       : tab === "timeline" ? html`<${Timeline} key=${"t" + JSON.stringify(focus)} focus=${focus} />`
       : tab === "meds" ? html`<${Meds} key=${"m" + JSON.stringify(focus)} focus=${focus} go=${go} />`
+      : tab === "sleep" ? html`<${Sleep} />`
       : html`<${Trends} key=${"r" + JSON.stringify(focus)} focus=${focus} />`;
     return html`<div>
       <header>
