@@ -64,44 +64,149 @@
     return html`<span class="chip" style="background:${typeColor(type)}"></span>${fmtType(type)}`;
   }
 
-  /* SVG 折線圖：series = [{label, color, points:[[date,val],…]}]，可選 refRange=[lo,hi]。
-     空序列不畫（單一來源時常見：只有健保沒有 Apple、或反之），全空才顯示無資料。 */
-  function LineChart({ series, unit, refRange }) {
-    const drawn = series.filter((s) => s.points.length);
+  /* ---------- 趨勢圖的時間軸工具（純函式，供 LineChart 與趨勢頁共用） ---------- */
+  const DAY = 864e5;
+  /* 日期字串 → 毫秒。"YYYY-MM" 視為該月一日（normDate 與 monthlyAvg 都會
+     產生這種形式）；null 與無法解析者回 NaN 由呼叫端剔除。 */
+  function tsOf(d) {
+    // 先擋非字串與空字串：new Date(null) 是 1970（epoch 0）而不是
+    // Invalid Date，光靠 isNaN 抓不到，一筆 null 就會把時間域下界
+    // 拉到 1970 且不拋錯
+    if (typeof d !== "string" || !d.trim()) return NaN;
+    const t = new Date(d).getTime();
+    return Number.isNaN(t) ? NaN : t;
+  }
+  const fmtDate = (t) => new Date(t).toISOString().slice(0, 10);
+
+  /* 剔除日期無法解析的點。一筆 null 會讓 new Date(null) 得 1970 而把時間域
+     下界整個拉走，且不拋錯（無聲失敗），故必須在算域之前處理。 */
+  function sanitize(points) {
+    const kept = [], dropped = [];
+    for (const p of points || []) (Number.isNaN(tsOf(p[0])) ? dropped : kept).push(p);
+    return { kept, dropped: dropped.length };
+  }
+
+  /* 依時間域過濾（含邊界）。不保留域外相鄰點：手寫 SVG 無裁切區域，
+     跨界點會畫到繪圖區外（design D5 明示選擇）。
+     月粒度（"YYYY-MM"）以「該月與區間有交集」判定，否則區間下界所在
+     月份的整桶會被丟掉。 */
+  function inRange(points, tMin, tMax) {
+    return (points || []).filter(([d]) => {
+      const t = tsOf(d);
+      if (Number.isNaN(t)) return false;
+      if (/^\d{4}-\d{2}$/.test(d)) {
+        const end = new Date(t); end.setUTCMonth(end.getUTCMonth() + 1);
+        return end.getTime() - 1 >= tMin && t <= tMax;   // 月份與區間有交集
+      }
+      return t >= tMin && t <= tMax;
+    });
+  }
+
+  /* 依時間挑刻度：粒度隨跨度，超過上限逐級降到不超過為止。
+     每個粒度都有下一級，近三月（週粒度 13 個）才有解。 */
+  const TICK_STEPS = [
+    ["year", 1], ["year", 2], ["year", 5],
+    ["month", 1], ["month", 3], ["month", 6],
+    ["week", 1], ["week", 2], ["month", 1],
+  ];
+  function timeTicks(tMin, tMax, maxTicks = 8) {
+    const span = Math.max(tMax - tMin, 1);
+    const start = span > 730 * DAY ? 0 : span > 91 * DAY ? 3 : 6;
+    for (let i = start; i < TICK_STEPS.length; i++) {
+      const [unit, n] = TICK_STEPS[i];
+      const ticks = [];
+      const d = new Date(tMin);
+      if (unit === "year") {
+        d.setUTCMonth(0, 1); d.setUTCHours(0, 0, 0, 0);
+        while (d.getTime() < tMin) d.setUTCFullYear(d.getUTCFullYear() + 1);
+        for (; d.getTime() <= tMax; d.setUTCFullYear(d.getUTCFullYear() + n)) {
+          ticks.push({ t: d.getTime(), label: String(d.getUTCFullYear()) });
+        }
+      } else if (unit === "month") {
+        d.setUTCDate(1); d.setUTCHours(0, 0, 0, 0);
+        while (d.getTime() < tMin) d.setUTCMonth(d.getUTCMonth() + 1);
+        for (; d.getTime() <= tMax; d.setUTCMonth(d.getUTCMonth() + n)) {
+          ticks.push({ t: d.getTime(), label: fmtDate(d.getTime()).slice(2, 7) });
+        }
+      } else {
+        d.setUTCHours(0, 0, 0, 0);
+        for (; d.getTime() <= tMax; d.setUTCDate(d.getUTCDate() + 7 * n)) {
+          ticks.push({ t: d.getTime(), label: fmtDate(d.getTime()).slice(5) });
+        }
+      }
+      if (ticks.length <= maxTicks) return ticks;
+    }
+    return [];
+  }
+
+  /* SVG 折線圖：series = [{label, color, points:[[date,val],…]}]，
+     domain={tMin,tMax} 為呼叫端傳入的共用時間域（趨勢頁四張圖同一組；
+     未傳則以本圖資料自身首末日為域，供總覽卡使用）。
+     空序列不畫（單一來源時常見），全空才顯示無資料。 */
+  const MARK_FULL = 118;   // 712px ÷ 6px（r=3 直徑）
+  const MARK_SMALL = 237;  // 712px ÷ 3px（r=1.5 直徑）
+  function LineChart({ series, unit, refRange, domain, note, onShowAll }) {
+    const W = 860, H = 240, PL = 48, PB = 28, PT = 10, PR = 100;
+    const PW = W - PL - PR;
+    let dropped = 0;
+    const cleaned = series.map((s) => {
+      const r = sanitize(s.points);
+      dropped += r.dropped;
+      return { ...s, points: r.kept };
+    });
+    const dom = domain || (() => {
+      const ts = cleaned.flatMap((s) => s.points.map((p) => tsOf(p[0])));
+      return ts.length ? { tMin: Math.min(...ts), tMax: Math.max(...ts) } : null;
+    })();
+    const scoped = dom
+      ? cleaned.map((s) => ({ ...s, points: inRange(s.points, dom.tMin, dom.tMax) }))
+      : cleaned;
+    const drawn = scoped.filter((s) => s.points.length);
     const all = drawn.flatMap((s) => s.points);
-    if (!all.length) return html`<p class="note">無資料</p>`;
-    const dates = [...new Set(all.map((p) => p[0]))].sort();
+    const foot = [note, dropped ? `已略過 ${dropped} 筆日期無法識別的紀錄` : null]
+      .filter(Boolean).join("；");
+    if (!all.length || !dom) {
+      return html`<p class="note">此區間無資料${foot ? `（${foot}）` : ""}
+        ${onShowAll && html` <button class="catbtn" onClick=${onShowAll}>看全部</button>`}</p>`;
+    }
     const vals = all.map((p) => p[1]);
     let lo = Math.min(...vals), hi = Math.max(...vals);
     if (refRange) { lo = Math.min(lo, refRange[0]); hi = Math.max(hi, refRange[1]); }
     const pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
-    const W = 860, H = 240, PL = 48, PB = 28, PT = 10, PR = 100;
-    const x = (d) => PL + dates.indexOf(d) * ((W - PL - PR) / Math.max(dates.length - 1, 1));
+    const span = Math.max(dom.tMax - dom.tMin, 1);
+    const x = (d) => PL + ((tsOf(d) - dom.tMin) / span) * PW;
     const y = (v) => PT + (H - PB - PT) - ((v - lo) / (hi - lo)) * (H - PB - PT);
     const gridN = 4, grid = [];
     for (let i = 0; i <= gridN; i++) {
       const v = lo + ((hi - lo) * i) / gridN;
-      grid.push(html`<line x1=${PL} y1=${y(v)} x2=${W - 8} y2=${y(v)} class="grid" />
+      grid.push(html`<line x1=${PL} y1=${y(v)} x2=${W - PR} y2=${y(v)} class="grid" />
         <text x=${PL - 6} y=${y(v) + 4} class="ax" text-anchor="end">${v.toFixed(v > 99 ? 0 : 1)}</text>`);
     }
-    const step = Math.max(Math.floor(dates.length / 7), 1);
-    const xlab = dates.filter((_, i) => i % step === 0).map((d) =>
-      html`<text x=${x(d)} y=${H - 8} class="ax" text-anchor="middle">${d.slice(2, 7)}</text>`);
-    const band = refRange ? html`<rect x=${PL} y=${y(refRange[1])} width=${W - PL - PR}
+    const xlab = timeTicks(dom.tMin, dom.tMax).map((tk) =>
+      html`<text x=${PL + ((tk.t - dom.tMin) / span) * PW} y=${H - 8}
+        class="ax" text-anchor="middle">${tk.label}</text>`);
+    const band = refRange ? html`<rect x=${PL} y=${y(refRange[1])} width=${PW}
         height=${Math.max(y(refRange[0]) - y(refRange[1]), 1)} class="refband" />` : null;
     return html`<div class="chartwrap"><svg viewBox="0 0 ${W} ${H}" width=${W} role="img">
       ${band}${grid}${xlab}
-      ${drawn.map((s) => {
+      ${drawn.map((s, si) => {
         const pts = s.points.map((p) => `${x(p[0])},${y(p[1])}`).join(" ");
         const last = s.points[s.points.length - 1];
+        // 標記半徑：序列顯式指定（如健保成健的獨立標記）優先，否則依
+        // 區間內點數兩段降級；超過 MARK_SMALL 不畫標記只畫折線
+        const r = s.marker || (s.points.length > MARK_SMALL ? 0
+          : s.points.length > MARK_FULL ? 1.5 : 3);
+        const name = s.label.length > 7 ? s.label.slice(0, 6) + "…" : s.label;
         return html`<g>
           ${s.points.length > 1 && html`<polyline points=${pts} fill="none" stroke=${s.color} stroke-width="2" />`}
-          ${s.points.map((p) => html`<circle cx=${x(p[0])} cy=${y(p[1])} r=${s.marker || (s.points.length > 400 ? 1.5 : 3)}
+          ${r > 0 && s.points.map((p) => html`<circle cx=${x(p[0])} cy=${y(p[1])} r=${r}
               fill=${s.color} stroke=${s.stroke || "none"} stroke-width="2">
             <title>${s.label} ${p[0]}：${p[1]} ${unit || ""}</title></circle>`)}
-          <text x=${x(last[0]) + 8} y=${y(last[1]) + 4} class="ax" fill=${s.color}>
-            ${s.label.length > 10 ? s.label.slice(0, 9) + "…" : s.label} ${last[1]}</text></g>`;
-      })}</svg></div>`;
+          <text x=${W - PR + 6} y=${PT + 14 + si * 30} class="ax" fill=${s.color}>${name}</text>
+          <text x=${W - PR + 6} y=${PT + 27 + si * 30} class="ax" fill=${s.color}>${last[1]}</text>
+        </g>`;
+      })}</svg></div>
+      ${foot && html`<p class="note">${foot}</p>`}`;
   }
 
   /* 處方時間軸：全資料期間為 x 軸，每次處方一根長條（高度＝給藥日數） */
@@ -334,6 +439,38 @@
     return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
   }
 
+  /* 趨勢序列集合：時間域下界、today 與預設區間判定皆以此為準。
+     MUST 含全部檢驗項目而非下拉當前選中者，否則切換檢驗項目會連帶
+     位移另外三張圖的 x 軸。 */
+  function trendBounds() {
+    const groups = [
+      DATA.measures["體重"] || [],
+      DATA.nhi_body.filter((b) => b.weight_kg).map((b) => [b.check_date, b.weight_kg]),
+      DATA.measures["收縮壓"] || [],
+      DATA.measures["舒張壓"] || [],
+      DATA.activity["步數"] || [],
+      DATA.labs.filter((l) => l.value_numeric != null).map((l) => [l.test_date, l.value_numeric]),
+    ];
+    const ts = groups.flat().map((p) => tsOf(p[0])).filter((t) => !Number.isNaN(t));
+    const gen = tsOf(DATA.meta.generated_at);
+    const latest = ts.length ? Math.max(...ts) : NaN;
+    // 上界取 generated_at 與資料最新日期的較大者：兩端 generated_at 的
+    // 產生方式曾不一致，且最新一筆可能晚於它，取小的會靜默隱藏該筆
+    const cands = [gen, latest].filter((t) => !Number.isNaN(t));
+    const today = cands.length ? Math.max(...cands) : Date.parse("2000-01-01");
+    return { today, latest, earliest: ts.length ? Math.min(...ts) : today };
+  }
+
+  const RANGES = [["3m", "近三月", 90], ["1y", "近一年", 365], ["all", "全部", null]];
+  function rangeDomain(key, today, earliest) {
+    const r = RANGES.find(([k]) => k === key) || RANGES[2];
+    return { tMin: r[2] == null ? earliest : today - r[2] * DAY, tMax: today };
+  }
+  /* 整體資料已停止數年時預設「全部」，否則會全頁皆空 */
+  function defaultRange(today, latest) {
+    return !Number.isNaN(latest) && today - latest <= 90 * DAY ? "1y" : "all";
+  }
+
   function Trends({ focus }) {
     const labNames = useMemo(() => {
       const names = {};
@@ -343,6 +480,10 @@
     const init = focus && focus.lab && labNames.some(([n]) => n === focus.lab)
       ? focus.lab : (labNames.length ? labNames[0][0] : "");
     const [sel, setSel] = useState(init);
+    const { today, latest, earliest } = useMemo(trendBounds, []);
+    const [range, setRange] = useState(() => defaultRange(today, latest));
+    const dom = rangeDomain(range, today, earliest);
+    const showAll = range === "all" ? null : () => setRange("all");
     const rows = (labNames.find(([n]) => n === sel) || [null, []])[1];
     const numRows = rows.filter((l) => l.value_numeric != null);
     const ref = numRows.length ? parseRef(numRows[numRows.length - 1].ref_range) : null;
@@ -357,12 +498,17 @@
       { label: "舒張壓", color: "var(--s2)", points: DATA.measures["舒張壓"] || [] },
     ];
     return html`<section>
+      <div class="filters">
+        ${RANGES.map(([k, label]) => html`<button class="catbtn ${range === k ? "on" : ""}"
+          onClick=${() => setRange(k)}>${label}</button>`)}
+        <span class="note">四張圖共用同一時間區間，可直接同期對照</span>
+      </div>
       <h2>檢驗趨勢</h2>
       <div class="filters"><select value=${sel} onChange=${(e) => setSel(e.target.value)}>
         ${labNames.map(([n, arr]) => html`<option value=${n}>${n}（${arr.length} 筆）</option>`)}
       </select></div>
       ${numRows.length > 0
-        ? html`<${LineChart} unit="" refRange=${ref}
+        ? html`<${LineChart} unit="" refRange=${ref} domain=${dom} onShowAll=${showAll}
             series=${[{ label: sel, color: "var(--s1)",
                         points: numRows.map((l) => [l.test_date, l.value_numeric]) }]} />`
         : html`<p class="note">此項目為文字型結果，僅列表不繪圖。</p>`}
@@ -375,12 +521,15 @@
           <td class="num">${l.value_text}${l.unmapped ? html` <span class="flag">unmapped</span>` : ""}</td>
           <td class="dt">${l.ref_range || "—"}</td><td class="dt">${l.facility_name}</td></tr>`)}</table>
       <h2>體重（Apple 每日中位數＋健保成健標記）</h2>
-      <${LineChart} unit="kg" series=${weightSeries} />
+      <${LineChart} unit="kg" series=${weightSeries} domain=${dom} onShowAll=${showAll} />
       <h2>血壓（每日中位數）</h2>
-      <${LineChart} unit="mmHg" series=${bpSeries} />
-      <h2>日均步數（每日單一來源最大值，月平均）</h2>
-      <${LineChart} unit="步" series=${[{ label: "日均步數", color: "var(--s1)",
-        points: monthlyAvg(DATA.activity["步數"] || []) }]} />
+      <${LineChart} unit="mmHg" series=${bpSeries} domain=${dom} onShowAll=${showAll} />
+      <h2>日均步數（每日單一來源最大值）</h2>
+      <${LineChart} unit="步" domain=${dom} onShowAll=${showAll}
+        note=${range === "3m" ? "逐日" : "月平均"}
+        series=${[{ label: "日均步數", color: "var(--s1)",
+          points: range === "3m" ? (DATA.activity["步數"] || [])
+            : monthlyAvg(DATA.activity["步數"] || []) }]} />
     </section>`;
   }
 
