@@ -26,7 +26,7 @@ const iso = (t) => new Date(t).toISOString().slice(0, 10);
 
 /* 建一顆形狀貼近使用者真實資料的庫 */
 async function shapePayload({ nullLabDate = false, staleAll = false,
-  latestAfterGenerated = false } = {}) {
+  latestAfterGenerated = false, weightEveryOtherDay = false, ancientDate = false } = {}) {
   const d = new NodeDriver(path.join(mkdtempSync(path.join(tmpdir(), "mhb-ta-")), "db.sqlite"));
   await initSchema(d);
   const pid = await createProfile(d, "示範");
@@ -49,9 +49,12 @@ async function shapePayload({ nullLabDate = false, staleAll = false,
   // 體重：起點依情境；每日一點（密集）
   const wStart = staleAll ? T - day(2000) : T - day(2766);
   const wEnd = staleAll ? T - day(1600) : T - day(4);
-  for (let t = wStart; t <= wEnd; t += day(1)) {
+  for (let t = wStart; t <= wEnd; t += day(weightEveryOtherDay ? 2 : 1)) {
     appleRows.push([pid, doc.apple, "HKQuantityTypeIdentifierBodyMass", "體重",
-      `${iso(t)} 07:10:00`, `${iso(t)} 07:10:00`, 72.5, null, null, "kg", "示範體重計", ""]);
+      `${iso(t)} 07:10:00`, `${iso(t)} 07:10:00`,
+      // 隨時間自 78 緩降至 70：不同區間的 y 上下界才會不同
+      Math.round((70 + 8 * (wEnd - t) / Math.max(wEnd - wStart, 1)) * 10) / 10,
+      null, null, "kg", "示範體重計", ""]);
   }
   if (latestAfterGenerated) {   // 一筆晚於 generated_at 的量測
     const t = T + day(1);
@@ -77,10 +80,11 @@ async function shapePayload({ nullLabDate = false, staleAll = false,
     ["profile_id", "doc_id", "type", "type_zh", "start_ts", "end_ts", "value_numeric",
       "value_normalized", "value_text", "unit", "source_name", "quality_flags"], appleRows);
   // 檢驗：3 筆（可選一筆 null 日期）
-  const labDates = staleAll
+  const labDates0 = staleAll
     ? [iso(T - day(2400)), iso(T - day(2000)), iso(T - day(1600))]
     : ["2024-10-23", "2025-08-14", "2026-07-03"];
-  if (nullLabDate) labDates.push(null);
+  const labDates = [...(ancientDate ? ["1985-06-01"] : []), ...labDates0,
+    ...(nullLabDate ? [null] : [])];
   await d.batchInsert("lab_results",
     ["profile_id", "doc_id", "section", "source_index", "record_fp", "canonical",
       "test_date", "facility_name", "order_name", "test_name_raw",
@@ -269,4 +273,126 @@ test("晚於 generated_at 的最新量測不被靜默隱藏", async () => {
   assert.ok(Math.max(...xs) <= PL + PW + 0.5,
     "最新點不得畫出繪圖區右緣（上界須含它）");
   assert.ok(Math.max(...xs) > PL + PW - 2, "最新點應貼齊右緣（它就是上界）");
+});
+
+/* ---- 以下為 QA 稽核（validator 突變測試）指出「宣稱有斷言但實際無效力」
+   之處的補強：中段門檻半徑、步數點數粒度、名稱截斷、刻度間距、y 軸重算、
+   月桶不出界、總覽卡標記、極大跨度刻度不為空、總覽血壓卡顯示日期。 ---- */
+
+test("標記中段門檻：119 至 237 點用 r=1.5 而非 r=3", async () => {
+  // 隔日體重 → 近一年約 183 點，落在中段
+  const { root, flush } = await trends(await shapePayload({ weightEveryOtherDay: true }));
+  btn(root, "近一年").dispatch("click");
+  await flush();
+  const weight = svgs(root).find((s) => inSvg(s, "circle").some((c) => num(c, "r") === 6));
+  const small = inSvg(weight, "circle").filter((c) => num(c, "r") === 1.5);
+  assert.ok(small.length > 118 && small.length <= 237,
+    `中段序列應以 r=1.5 繪製，實際 r=1.5 的標記 ${small.length} 個`);
+  assert.equal(inSvg(weight, "circle").filter((c) => num(c, "r") === 3).length, 0,
+    "中段序列不應出現 r=3");
+});
+
+test("步數粒度：點數真的隨區間改變（非只有圖說文字）", async () => {
+  const { root, flush } = await trends(await shapePayload());
+  const stepPts = () => {
+    const s = svgs(root).find((x) => inSvg(x, "text")
+      .some((t) => t.textContent.includes("日均步數")));
+    const poly = inSvg(s, "polyline")[0];
+    return (poly.getAttribute("points") || "").split(" ").filter(Boolean).length;
+  };
+  btn(root, "近三月").dispatch("click");
+  await flush();
+  const daily = stepPts();
+  btn(root, "全部").dispatch("click");
+  await flush();
+  const monthly = stepPts();
+  assert.ok(daily > 30, `近三月應為逐日（實際 ${daily} 點）`);
+  assert.ok(monthly < 30, `全部應為月平均（實際 ${monthly} 點）`);
+});
+
+test("圖例名稱確實被截斷（8 字標籤要出現省略號）", async () => {
+  const { root, flush } = await trends(await shapePayload());
+  btn(root, "全部").dispatch("click");
+  await flush();
+  const weight = svgs(root).find((s) => inSvg(s, "circle").some((c) => num(c, "r") === 6));
+  const names = legend(weight).map((t) => t.textContent);
+  const long = names.find((n) => n.startsWith("體重"));
+  assert.ok(long, `找不到體重序列圖例，實際 ${JSON.stringify(names)}`);
+  assert.ok(long.endsWith("…"), `原標籤「體重（自主量測）」8 字應被截斷，實際「${long}」`);
+  for (const n of names) assert.ok(n.length <= 7, `圖例「${n}」應 ≤ 7 字`);
+});
+
+test("刻度相鄰間距足夠（不重疊）", async () => {
+  const { root, flush } = await trends(await shapePayload());
+  for (const r of ["全部", "近一年", "近三月"]) {
+    btn(root, r).dispatch("click");
+    await flush();
+    const s = svgs(root).find((x) => xTicks(x).length);
+    const xs = inSvg(s, "text").filter((t) => num(t, "y") === X_TICK_Y)
+      .map((t) => num(t, "x")).sort((a, b) => a - b);
+    for (let i = 1; i < xs.length; i++) {
+      assert.ok(xs[i] - xs[i - 1] >= 40,
+        `${r} 相鄰刻度間距 ${(xs[i] - xs[i - 1]).toFixed(0)}px 應 ≥ 40px`);
+    }
+  }
+});
+
+test("切區間後 y 軸重算", async () => {
+  const { root, flush } = await trends(await shapePayload());
+  const yLabels = () => {
+    // 抓體重圖：檢驗圖的上下界被參考值灰帶固定，不隨區間變動（正確行為）
+    const s = svgs(root).find((x) => legend(x).some((t) => t.textContent.startsWith("體重")));
+    assert.ok(s, "找不到體重圖");
+    return inSvg(s, "text").filter((t) => num(t, "x") < PL).map((t) => t.textContent).join("|");
+  };
+  btn(root, "全部").dispatch("click");
+  await flush();
+  const all = yLabels();
+  btn(root, "近三月").dispatch("click");
+  await flush();
+  assert.notEqual(yLabels(), all, "縱軸上下界應依區間內資料重算");
+});
+
+test("月粒度序列不畫到繪圖區外（區間下界不在月初時）", async () => {
+  const { root, flush } = await trends(await shapePayload());
+  for (const r of ["近一年", "全部"]) {
+    btn(root, r).dispatch("click");
+    await flush();
+    const s = svgs(root).find((x) => inSvg(x, "text")
+      .some((t) => t.textContent.includes("日均步數")));
+    const poly = inSvg(s, "polyline")[0];
+    const xs = (poly.getAttribute("points") || "").split(" ").filter(Boolean)
+      .map((pt) => Number(pt.split(",")[0]));
+    assert.ok(Math.min(...xs) >= PL - 0.5,
+      `${r} 月桶最左 x=${Math.min(...xs).toFixed(1)} 不得小於繪圖區左緣 ${PL}`);
+  }
+});
+
+test("總覽體重卡維持標記與逐點提示（該卡無區間可切，不得歸零）", async () => {
+  const { root, flush } = render(await shapePayload());
+  await flush();   // 停在總覽頁
+  const card = svgs(root).find((s) => inSvg(s, "circle").length > 0);
+  assert.ok(card, "總覽體重卡應有標記");
+  const c = inSvg(card, "circle");
+  assert.ok(c.length > 200, `總覽卡點數應為 slice(-365) 量級，實際 ${c.length}`);
+  assert.ok(c.every((x) => num(x, "r") > 0), "總覽卡標記半徑不得為 0");
+  assert.ok(findAll(card, (e) => e.localName === "title").length > 200,
+    "總覽卡應保留逐點數值提示");
+});
+
+test("極大跨度仍有 x 軸刻度（不得靜默變成零刻度）", async () => {
+  const { root, flush } = await trends(await shapePayload({ ancientDate: true }));
+  btn(root, "全部").dispatch("click");
+  await flush();
+  const ticks = svgs(root).map(xTicks).find((t) => t.length !== undefined && t.length >= 0);
+  const any = svgs(root).map(xTicks).filter((t) => t.length);
+  assert.ok(any.length > 0 && any[0].length >= 2,
+    `跨度 40 年以上仍須有刻度，實際 ${JSON.stringify(ticks)}`);
+});
+
+test("總覽血壓卡顯示量測日期（避免陳舊數值看似當前）", async () => {
+  const { root, flush } = render(await shapePayload());
+  await flush();
+  assert.match(root.textContent, /mmHg｜\d{4}-\d{2}-\d{2}/,
+    "血壓卡應在單位旁顯示最近量測日期");
 });

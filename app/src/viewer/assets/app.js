@@ -104,21 +104,27 @@
 
   /* 依時間挑刻度：粒度隨跨度，超過上限逐級降到不超過為止。
      每個粒度都有下一級，近三月（週粒度 13 個）才有解。 */
-  const TICK_STEPS = [
-    ["year", 1], ["year", 2], ["year", 5],
+  /* 由細到粗的單一階梯：起始粒度依跨度挑，之後只會往「更粗」走。
+     用平坦陣列且順序不單調會出事——舊版年粒度用盡後掉進 month/1（更細），
+     一路更細直到耗盡而回傳空陣列，跨度超過約 40 年時 x 軸一個標籤都沒有，
+     且不拋錯（民國年被誤解析成 19xx 就會踩到）。 */
+  const TICK_LADDER = [
+    ["week", 1], ["week", 2],
     ["month", 1], ["month", 3], ["month", 6],
-    ["week", 1], ["week", 2], ["month", 1],
+    ["year", 1], ["year", 2], ["year", 5], ["year", 10], ["year", 20], ["year", 50],
   ];
   function timeTicks(tMin, tMax, maxTicks = 8) {
     const span = Math.max(tMax - tMin, 1);
-    const start = span > 730 * DAY ? 0 : span > 91 * DAY ? 3 : 6;
-    for (let i = start; i < TICK_STEPS.length; i++) {
-      const [unit, n] = TICK_STEPS[i];
+    const start = span > 730 * DAY ? 5 : span > 91 * DAY ? 2 : 0;
+    for (let i = start; i < TICK_LADDER.length; i++) {
+      const [unit, n] = TICK_LADDER[i];
       const ticks = [];
       const d = new Date(tMin);
       if (unit === "year") {
         d.setUTCMonth(0, 1); d.setUTCHours(0, 0, 0, 0);
-        while (d.getTime() < tMin) d.setUTCFullYear(d.getUTCFullYear() + 1);
+        // 對齊到 n 的倍數年，否則刻度會錨在資料起點的年份（如 2007/2012/2017）
+        if (n > 1) d.setUTCFullYear(Math.ceil(d.getUTCFullYear() / n) * n);
+        while (d.getTime() < tMin) d.setUTCFullYear(d.getUTCFullYear() + n);
         for (; d.getTime() <= tMax; d.setUTCFullYear(d.getUTCFullYear() + n)) {
           ticks.push({ t: d.getTime(), label: String(d.getUTCFullYear()) });
         }
@@ -136,18 +142,28 @@
       }
       if (ticks.length <= maxTicks) return ticks;
     }
-    return [];
+    // 保底：跨度大到連最粗粒度都超過上限時，仍給首末兩刻度（絕不回空）
+    return [{ t: tMin, label: fmtDate(tMin).slice(0, 4) },
+            { t: tMax, label: fmtDate(tMax).slice(0, 4) }];
   }
 
   /* SVG 折線圖：series = [{label, color, points:[[date,val],…]}]，
      domain={tMin,tMax} 為呼叫端傳入的共用時間域（趨勢頁四張圖同一組；
      未傳則以本圖資料自身首末日為域，供總覽卡使用）。
      空序列不畫（單一來源時常見），全空才顯示無資料。 */
-  const MARK_FULL = 118;   // 712px ÷ 6px（r=3 直徑）
-  const MARK_SMALL = 237;  // 712px ÷ 3px（r=1.5 直徑）
-  function LineChart({ series, unit, refRange, domain, note, onShowAll }) {
-    const W = 860, H = 240, PL = 48, PB = 28, PT = 10, PR = 100;
-    const PW = W - PL - PR;
+  /* 折線圖尺寸提到模組層，讓標記門檻由繪圖區寬度推導而非硬編碼
+     （改 W／PL／PR 時門檻自動跟著走） */
+  const CH = { W: 860, H: 240, PL: 48, PB: 28, PT: 10, PR: 100 };
+  const CH_PW = CH.W - CH.PL - CH.PR;              // 繪圖區寬 712px
+  const MARK_FULL = Math.floor(CH_PW / 6);         // r=3 直徑 6px → 118 點
+  const MARK_SMALL = Math.floor(CH_PW / 3);        // r=1.5 直徑 3px → 237 點
+  // 無區間控制項的圖（總覽卡）不得套用「不畫標記」那一段：使用者在那裡
+  // 沒有切區間的手段可以把逐點數值提示要回來，故上限放寬到不歸零
+  const MARK_NO_RANGE = Math.ceil(CH_PW / 1.8);    // 396 點
+  function LineChart({ series, unit, refRange, domain, note, onShowAll,
+    markerLimit = MARK_SMALL, rangeLabel }) {
+    const { W, H, PL, PB, PT, PR } = CH;
+    const PW = CH_PW;
     let dropped = 0;
     const cleaned = series.map((s) => {
       const r = sanitize(s.points);
@@ -166,7 +182,7 @@
     const foot = [note, dropped ? `已略過 ${dropped} 筆日期無法識別的紀錄` : null]
       .filter(Boolean).join("；");
     if (!all.length || !dom) {
-      return html`<p class="note">此區間無資料${foot ? `（${foot}）` : ""}
+      return html`<p class="note">${rangeLabel || "此區間"}無資料${foot ? `（${foot}）` : ""}
         ${onShowAll && html` <button class="catbtn" onClick=${onShowAll}>看全部</button>`}</p>`;
     }
     const vals = all.map((p) => p[1]);
@@ -174,7 +190,11 @@
     if (refRange) { lo = Math.min(lo, refRange[0]); hi = Math.max(hi, refRange[1]); }
     const pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
     const span = Math.max(dom.tMax - dom.tMin, 1);
-    const x = (d) => PL + ((tsOf(d) - dom.tMin) / span) * PW;
+    // 座標夾在時間域內：月粒度序列以「月份與區間有交集」納入（見 inRange），
+    // 其代表日期是該月 1 日，可能早於 tMin；不夾的話會畫到繪圖區左外側，
+    // 極端情況（區間下界在月底）甚至畫出 viewBox 而完全看不見
+    const x = (d) => PL
+      + ((Math.min(Math.max(tsOf(d), dom.tMin), dom.tMax) - dom.tMin) / span) * PW;
     const y = (v) => PT + (H - PB - PT) - ((v - lo) / (hi - lo)) * (H - PB - PT);
     const gridN = 4, grid = [];
     for (let i = 0; i <= gridN; i++) {
@@ -194,7 +214,7 @@
         const last = s.points[s.points.length - 1];
         // 標記半徑：序列顯式指定（如健保成健的獨立標記）優先，否則依
         // 區間內點數兩段降級；超過 MARK_SMALL 不畫標記只畫折線
-        const r = s.marker || (s.points.length > MARK_SMALL ? 0
+        const r = s.marker || (s.points.length > markerLimit ? 0
           : s.points.length > MARK_FULL ? 1.5 : 3);
         const name = s.label.length > 7 ? s.label.slice(0, 6) + "…" : s.label;
         return html`<g>
@@ -270,7 +290,8 @@
         </${Card}>
         <${Card} icon="♥" color="var(--s2)" title="血壓（最近量測日）">
           ${sys != null ? html`<div class="big">${sys}<small>/${dia}</small></div>
-            <div class="delta flat">mmHg</div>` : html`<p class="note">尚無量測資料</p>`}
+            <div class="delta flat">mmHg｜${(DATA.measures["收縮壓"] || []).at(-1)?.[0] || ""}</div>`
+            : html`<p class="note">尚無量測資料</p>`}
         </${Card}>
         <${Card} icon="🏃" color="var(--s4)" title="日均步數（30日）">
           ${steps30 != null ? html`<div class="big">${steps30.toLocaleString()}</div>
@@ -284,8 +305,8 @@
             : html`<p class="note">尚無資料</p>`}
         </${Card}>
         <${Card} wide icon="⚖︎" color="var(--s1)" title="體重趨勢（一年）">
-          <${LineChart} unit="kg" series=${[{ label: "體重", color: "var(--s1)",
-            points: weightYear }]} />
+          <${LineChart} unit="kg" markerLimit=${MARK_NO_RANGE}
+            series=${[{ label: "體重", color: "var(--s1)", points: weightYear }]} />
         </${Card}>
         <${Card} wide icon="🧪" color="var(--s3)" title="最新檢驗（點入看趨勢）">
           <table>${recentLabs.map((l) => html`<tr class="rowlink"
@@ -484,9 +505,13 @@
     const [range, setRange] = useState(() => defaultRange(today, latest));
     const dom = rangeDomain(range, today, earliest);
     const showAll = range === "all" ? null : () => setRange("all");
+    const rangeLabel = (RANGES.find(([k]) => k === range) || [])[1];
     const rows = (labNames.find(([n]) => n === sel) || [null, []])[1];
     const numRows = rows.filter((l) => l.value_numeric != null);
     const ref = numRows.length ? parseRef(numRows[numRows.length - 1].ref_range) : null;
+    // 檢驗在當前區間內有無數值點（無則不印灰帶說明，避免說明沒有的東西）
+    const labInRange = inRange(numRows.map((l) => [l.test_date, l.value_numeric]),
+      dom.tMin, dom.tMax).length > 0;
     const know = DATA.knowledge[sel];
     const weightSeries = [
       { label: "體重（自主量測）", color: "var(--s1)", points: DATA.measures["體重"] || [] },
@@ -508,11 +533,11 @@
         ${labNames.map(([n, arr]) => html`<option value=${n}>${n}（${arr.length} 筆）</option>`)}
       </select></div>
       ${numRows.length > 0
-        ? html`<${LineChart} unit="" refRange=${ref} domain=${dom} onShowAll=${showAll}
+        ? html`<${LineChart} unit="" refRange=${ref} domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel}
             series=${[{ label: sel, color: "var(--s1)",
                         points: numRows.map((l) => [l.test_date, l.value_numeric]) }]} />`
         : html`<p class="note">此項目為文字型結果，僅列表不繪圖。</p>`}
-      ${ref && html`<p class="note">灰帶為最近一次報告之參考值區間 ${numRows[numRows.length - 1].ref_range}</p>`}
+      ${ref && labInRange && html`<p class="note">灰帶為最近一次報告之參考值區間 ${numRows[numRows.length - 1].ref_range}</p>`}
       ${know && html`<p class="know">${know.description}<br />
         <span class="dt">來源：<a href=${know.source_url} target="_blank" rel="noopener">${know.source_name}</a>
         （引用日期 ${know.cited_date}）</span></p>`}
@@ -521,11 +546,11 @@
           <td class="num">${l.value_text}${l.unmapped ? html` <span class="flag">unmapped</span>` : ""}</td>
           <td class="dt">${l.ref_range || "—"}</td><td class="dt">${l.facility_name}</td></tr>`)}</table>
       <h2>體重（Apple 每日中位數＋健保成健標記）</h2>
-      <${LineChart} unit="kg" series=${weightSeries} domain=${dom} onShowAll=${showAll} />
+      <${LineChart} unit="kg" series=${weightSeries} domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel} />
       <h2>血壓（每日中位數）</h2>
-      <${LineChart} unit="mmHg" series=${bpSeries} domain=${dom} onShowAll=${showAll} />
+      <${LineChart} unit="mmHg" series=${bpSeries} domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel} />
       <h2>日均步數（每日單一來源最大值）</h2>
-      <${LineChart} unit="步" domain=${dom} onShowAll=${showAll}
+      <${LineChart} unit="步" domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel}
         note=${range === "3m" ? "逐日" : "月平均"}
         series=${[{ label: "日均步數", color: "var(--s1)",
           points: range === "3m" ? (DATA.activity["步數"] || [])
