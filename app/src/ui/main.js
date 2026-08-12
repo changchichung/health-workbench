@@ -12,6 +12,7 @@ import { createImportFlow } from "./import_flow.js";
 import { createViewer } from "./viewer.js";
 import { createHistory } from "./history.js";
 import { createProfileManager } from "./profile_manager.js";
+import { localDateISO } from "../engine/values.js";
 
 const statusEl = document.getElementById("status");
 const noticeEl = document.getElementById("notice");
@@ -224,7 +225,7 @@ async function wireUi() {
       const t = window.__TAURI__;
       const save = t.dialog.save || t.dialog.default?.save;
       const startDir = await dialogStartDir("export");
-      const name = backupFileName(new Date().toISOString().slice(0, 10));
+      const name = backupFileName(localDateISO());
       const target = await save({
         title: "匯出資料庫檔（含全部成員個資，請妥善保管）",
         defaultPath: startDir ? `${startDir}/${name}` : name,

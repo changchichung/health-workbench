@@ -4,6 +4,7 @@
 // tests/ui/export_name.test.mjs 直測）。
 import { buildPayload } from "../provider/payload.js";
 import { assemble, loadAssets } from "../provider/assemble.js";
+import { localDateISO } from "../engine/values.js";
 
 // 純函式：匯出檔名。檔名不安全字元（含控制字元）代換為底線。
 export function exportFileName(memberName, dateStr) {
@@ -69,7 +70,7 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
       profileId,
       knowledgeEntries: labEntries,
       drugCachePath: await drugCachePath(),
-      today: new Date().toISOString().slice(0, 10),
+      today: localDateISO(),
     });
     lastHtml = assemble(payload, assets);
     lastMemberName = payload.meta.profile;
@@ -113,8 +114,7 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
       const save = t.dialog.save || t.dialog.default?.save;
       // 起始目錄：記憶上次匯出位置，首次退「文件」（main.js dialogStartDir）
       const startDir = await (getExportStartDir?.() ?? null);
-      const name = exportFileName(lastMemberName,
-        new Date().toISOString().slice(0, 10));
+      const name = exportFileName(lastMemberName, localDateISO());
       target = await save({
         title: `匯出單檔 HTML（僅成員「${lastMemberName}」的資料，含個資請妥善保管）`,
         defaultPath: startDir ? `${startDir}/${name}` : name,

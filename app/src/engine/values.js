@@ -42,6 +42,15 @@ export function toNum(s) {
   return INT_RE.test(t) ? parseInt(t, 10) : null;
 }
 
+// 本機時區的今天（YYYY-MM-DD）。NEVER 用 toISOString()：那是 UTC 日期，
+// 台北 UTC+8 每天 00:00-08:00 會早一天，與 Python 端 date.today()（本地）
+// 產生的 generated_at 不一致；趨勢圖以 generated_at 為時間軸上界後，
+// 這個落差會直接反映成兩邊圖形差一日。
+export function localDateISO(d = new Date()) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 // nhi_json.norm_date 等價：8 碼 → YYYY-MM-DD；6 碼 → YYYY-MM；其餘 null。
 export function normDate(s) {
   if (!s || typeof s !== "string") return null;
