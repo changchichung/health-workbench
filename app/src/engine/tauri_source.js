@@ -40,6 +40,70 @@ export async function tauriFileSource(filePath, chunkSize = 4 * 1024 * 1024) {
   };
 }
 
+// 多檔來源（design D1／D9）：列出資料夾內的檔案供 registry.detectSet 判型。
+// 判型階段只做 readDir，不 stat 也不讀內容；header 由 readHeader() 惰性取得，
+// adapter 只讀自己需要的那幾個檔。實際的 ByteSource 等選定 adapter 後才建立
+// （見 buildSourceSetTauri），含上千個檔案的資料夾才不會因為判型就付出
+// 上千次 IO。
+// maxEntries 是必要的防線而非最佳化：使用者可能選到 Downloads 這種大目錄，
+// 無上限地列舉兩層會讓 UI 卡住。CPAP 的一張卡實測是數百個檔，5000 已極寬鬆；
+// 達到上限即停止列舉，判型仍以已收集到的部分進行。
+export async function collectDirEntriesTauri(dirPath, opts = {}) {
+  return collectDirEntries(window.__TAURI__.fs, dirPath, opts);
+}
+
+// fs 注入版（走訪邏輯獨立可測：深度、上限、relPath 組合、路徑分隔符）
+export async function collectDirEntries(fs, dirPath,
+  { maxDepth = 2, headerBytes = 8192, maxEntries = 5000 } = {}) {
+  const sep = dirPath.includes("\\") ? "\\" : "/";
+  const join = (dir, name) => `${dir}${dir.endsWith(sep) ? "" : sep}${name}`;
+  const out = [];
+  async function walk(dir, rel, depth) {
+    if (out.length >= maxEntries) return;
+    const entries = await fs.readDir(dir).catch(() => []);
+    for (const e of entries) {
+      if (out.length >= maxEntries) return;
+      const full = join(dir, e.name);
+      const relPath = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory) {
+        if (depth < maxDepth) await walk(full, relPath, depth + 1);
+        continue;
+      }
+      out.push({
+        relPath,
+        path: full,
+        async readHeader() {
+          const f = await fs.open(full, { read: true });
+          try {
+            const buf = new Uint8Array(headerBytes);
+            let filled = 0;
+            while (filled < headerBytes) {
+              const n = await f.read(buf.subarray(filled));
+              if (n === null || n === 0) break;
+              filled += n;
+            }
+            return buf.subarray(0, filled);
+          } finally {
+            await f.close();
+          }
+        },
+      });
+    }
+  }
+  await walk(dirPath, "", 1);
+  return out;
+}
+
+// 判型完成後才把 entries 補上實際的 ByteSource（此處才 stat）
+export async function buildSourceSetTauri(dirPath, entries) {
+  const name = dirPath.split(/[/\\]/).filter(Boolean).pop() || dirPath;
+  const withSources = [];
+  for (const e of entries) {
+    withSources.push({ relPath: e.relPath, source: await tauriFileSource(e.path) });
+  }
+  return { rootName: name, entries: withSources };
+}
+
 // 資料夾情境：找出非 cda 的 .xml（語意同 tests/helpers 的 resolveAppleDir）。
 // 頂層找不到時下潛一層子資料夾（使用者常選到外層目錄如 Downloads，
 // 匯出實際在其中的 apple_health_export/；2026-08-10 走查回饋）

@@ -5,7 +5,8 @@
 // 身分證比對三態（attributionState 純函式，tests/ui/attribution.test.mjs
 // 直測），不符停用「開始匯入」；b1.1 預讀不可得時交引擎護欄第二層把關。
 import { registry } from "../adapters/index.js";
-import { tauriFileSource, resolveAppleDirTauri } from "../engine/tauri_source.js";
+import { tauriFileSource, resolveAppleDirTauri, collectDirEntriesTauri,
+  buildSourceSetTauri } from "../engine/tauri_source.js";
 import { nhiJsonAdapter } from "../adapters/nhi_json.js";
 import { nhiXmlAdapter } from "../adapters/nhi_xml.js";
 import { listProfiles, createProfile } from "../engine/profiles.js";
@@ -33,6 +34,55 @@ export function attributionNote(maskedId, member) {
     default:
       return "";
   }
+}
+
+// 確認面板的來源標籤（純函式，tests/ui/import_batch.test.mjs 直測）。
+// 單檔顯示檔名與大小；多檔來源顯示資料夾名、檔數與合計大小。
+export function sourceChipText(pending) {
+  const mb = (n) => `${(n / 1048576).toFixed(1)}MB`;
+  if (pending?.sourceSet) {
+    return `${pending.sourceSet.rootName}｜${pending.fileCount} 個檔案，`
+      + `合計 ${mb(pending.totalBytes)}`;
+  }
+  return `${pending.source.name}｜${mb(pending.source.size)}`;
+}
+
+// 批次匯入的檔案摘要（純函式）。files 為 [{ file, status, rows }]
+export function batchSummary(files) {
+  const by = (s) => files.filter(f => f.status === s).length;
+  return {
+    total: files.length,
+    parsed: by("parsed"),
+    duplicate: by("duplicate"),
+    parseError: by("parse_error"),
+    oversize: by("skipped_oversize"),
+    rows: files.reduce((a, f) => a + (f.rows || 0), 0),
+  };
+}
+
+const FILE_STATUS_ZH = {
+  parsed: "已解析",
+  duplicate: "先前已匯入",
+  parse_error: "解析失敗",
+  skipped_oversize: "超過單檔上限，略過",
+};
+
+// 逐檔明細（批次匯入才有）。收合呈現：上百個檔案不該淹沒節區摘要。
+function fileDetails(files) {
+  const s = batchSummary(files);
+  const head = [
+    `${s.total} 個檔案`,
+    s.parsed ? `已解析 ${s.parsed}` : "",
+    s.duplicate ? `先前已匯入 ${s.duplicate}` : "",
+    s.parseError ? `解析失敗 ${s.parseError}` : "",
+    s.oversize ? `略過 ${s.oversize}` : "",
+  ].filter(Boolean).join("｜");
+  const rows = files.map(f => `<tr><td>${escapeHtml(f.file)}</td>
+    <td>${escapeHtml(FILE_STATUS_ZH[f.status] ?? f.status)}</td>
+    <td>${Number(f.rows) || 0}</td></tr>`).join("");
+  return `<details><summary>逐檔明細（${escapeHtml(head)}）</summary>
+    <table><thead><tr><th>檔案</th><th>狀態</th><th>筆數</th></tr></thead>
+    <tbody>${rows}</tbody></table></details>`;
 }
 
 export function createImportFlow({ getDriver, labEntries, onImported,
@@ -71,10 +121,33 @@ export function createImportFlow({ getDriver, labEntries, onImported,
     }
     let filePath = path;
     if (st.isDirectory) {
+      // 多檔來源優先（design D9）：detectSet 判的是「這批檔案整體是什麼」，
+      // 條件嚴格；resolveAppleDirTauri 判的是「有沒有任何非 cda 的 XML」，
+      // 條件寬鬆且會下潛一層。寬鬆的放後面，含無關 XML 的 SD 卡才不會被
+      // 誤判成 Apple 匯出。
+      const dirEntries = await collectDirEntriesTauri(path);
+      const setAdapter = await registry.detectSet(dirEntries);
+      if (setAdapter) {
+        const sourceSet = await buildSourceSetTauri(path, dirEntries);
+        const totalBytes = sourceSet.entries.reduce(
+          (a, e) => a + (e.source.size || 0), 0);
+        pending = { adapter: setAdapter, sourceSet, path, maskedId: null,
+          profileId: null, fileCount: sourceSet.entries.length, totalBytes };
+        state = "confirming";
+        say("");
+        await renderConfirm();
+        return { state, detected: setAdapter.id };
+      }
       const resolved = await resolveAppleDirTauri(path);
       if (!resolved) {
-        say("資料夾內找不到 Apple Health 匯出 XML。");
-        return { state, rejected: "no_xml_in_dir" };
+        // 兩種路徑都不認得：比照單檔未識別，列出全部支援格式，
+        // 不再只說「找不到 Apple Health XML」（現在支援的不只 Apple）
+        say(`無法識別資料夾「${escapeHtml(path.split(/[/\\]/).pop())}」。目前支援的格式：`);
+        confirmBox.innerHTML = `<ul>${registry.formats()
+          .map(f => `<li>${escapeHtml(f)}</li>`).join("")}</ul>`;
+        show(confirmBox);
+        state = "idle";
+        return { state, rejected: "unknown_format", formats: registry.formats() };
       }
       filePath = resolved;
     }
@@ -107,7 +180,7 @@ export function createImportFlow({ getDriver, labEntries, onImported,
   // 判型確認面板：格式＋檔名＋歸屬成員選擇（必選無預設）＋三態提示
   async function renderConfirm({ newMemberMode = false } = {}) {
     const profiles = await listProfiles(getDriver());
-    const { adapter, source, maskedId, profileId } = pending;
+    const { adapter, maskedId, profileId } = pending;
     const selected = profiles.find(p => p.id === profileId) ?? null;
     const zeroMembers = profiles.length === 0;
     const options = [
@@ -120,7 +193,7 @@ export function createImportFlow({ getDriver, labEntries, onImported,
     const canGo = profileId != null && !mismatch;
     confirmBox.innerHTML = `
       <p class="fmt">${escapeHtml(adapter.formatDesc)}</p>
-      <p><span class="file-chip">${escapeHtml(source.name)}｜${(source.size / 1048576).toFixed(1)}MB</span></p>
+      <p><span class="file-chip">${escapeHtml(sourceChipText(pending))}</span></p>
       <div class="attribution">
         <label for="import-profile-select">這份資料屬於：</label>
         ${zeroMembers && !newMemberMode
@@ -165,7 +238,7 @@ export function createImportFlow({ getDriver, labEntries, onImported,
 
   async function runImport() {
     if (!pending || state === "importing" || pending.profileId == null) return { state };
-    const { adapter, source, path, profileId } = pending;
+    const { adapter, source, sourceSet, path, profileId } = pending;
     // 報告卡顯示歸屬成員（D1 防呆：Apple 檔人眼確認的最後一環）
     const profiles = await listProfiles(getDriver());
     const memberName = profiles.find(p => p.id === profileId)?.display_name ?? "";
@@ -182,12 +255,18 @@ export function createImportFlow({ getDriver, labEntries, onImported,
     };
     let result;
     try {
-      const needsBytes = adapter === nhiJsonAdapter || adapter === nhiXmlAdapter;
-      const src = needsBytes
-        ? { bytes: await window.__TAURI__.fs.readFile(path), name: source.name }
-        : source;
-      result = await adapter.importSource(src, getDriver(), progress,
-        { labEntries, profileId });
+      if (sourceSet) {
+        // 多檔來源：整批在單一交易內完成（design D1）
+        result = await adapter.importSourceSet(sourceSet, getDriver(), progress,
+          { labEntries, profileId });
+      } else {
+        const needsBytes = adapter === nhiJsonAdapter || adapter === nhiXmlAdapter;
+        const src = needsBytes
+          ? { bytes: await window.__TAURI__.fs.readFile(path), name: source.name }
+          : source;
+        result = await adapter.importSource(src, getDriver(), progress,
+          { labEntries, profileId });
+      }
     } catch (err) {
       state = "idle";
       pending = null;
@@ -208,6 +287,13 @@ export function createImportFlow({ getDriver, labEntries, onImported,
   function renderResult(result, memberName) {
     say("");
     if (result.status === "skipped_duplicate") {
+      // 多檔來源整批命中時已自帶訊息（「這張卡的 N 個檔案先前都已匯入」）
+      if (result.source?.files) {
+        reportBox.innerHTML = `<p>${escapeHtml(result.messages.at(-1) || "已全部匯入過")}</p>`
+          + fileDetails(result.source.files);
+        show(reportBox);
+        return;
+      }
       const origin = result.originDisplayName
         ? `匯入至成員「${escapeHtml(result.originDisplayName)}」` : "匯入過";
       reportBox.innerHTML = `<p>此檔案先前已於 <strong>${escapeHtml(result.importedAt)}</strong>
@@ -236,15 +322,21 @@ export function createImportFlow({ getDriver, labEntries, onImported,
       .map(([k, v]) => `${escapeHtml(k)}×${v}`).join("、") || "無";
     const unmapped = (r.unmapped_lab_names ?? []);
     const perr = r.source.parse_errors ?? [];
+    const files = r.source.files;
+    const heading = files
+      ? `匯入完成：${escapeHtml(r.source.filename)}（${files.length} 個檔案`
+        + `，其中 ${r.source.new_files} 個是新的｜成員「${escapeHtml(memberName)}」）`
+      : `匯入完成：${escapeHtml(r.source.filename)}（成員「${escapeHtml(memberName)}」）`;
     reportBox.innerHTML = `
-      <h3>匯入完成：${escapeHtml(r.source.filename)}（成員「${escapeHtml(memberName)}」）</h3>
+      <h3>${heading}</h3>
       <table><thead><tr><th>節區</th><th>狀態</th><th>筆數</th></tr></thead>
         <tbody>${secRows}</tbody></table>
       <p>重複（冪等跳過）：${dedupText}</p>
       <p>品質旗標：${flags}</p>
       ${unmapped.length ? `<p>未對照檢驗名 ${unmapped.length} 項：${unmapped.map(escapeHtml).join("、")}</p>` : ""}
       ${perr.length ? `<details class="warn"><summary>部分紀錄解析失敗（已續行，該筆未入庫）：${perr.length} 筆</summary>
-        <ul>${perr.map(e => `<li>${escapeHtml(e)}</li>`).join("")}</ul></details>` : ""}`;
+        <ul>${perr.map(e => `<li>${escapeHtml(e)}</li>`).join("")}</ul></details>` : ""}
+      ${files ? fileDetails(files) : ""}`;
     show(reportBox);
   }
 

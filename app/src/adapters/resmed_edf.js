@@ -267,12 +267,14 @@ export const resmedEdfAdapter = {
     return false;
   },
 
-  // 多檔判型（design D1／D9）：卡片內要有 STR.edf 且其 header 通過 EDF 判型
-  detectSet(entries) {
+  // 多檔判型（design D1／D9）：卡片內要有 STR.edf 且其 header 通過 EDF 判型。
+  // 只讀這一個檔的 header：資料夾可能含上千個與本 adapter 無關的檔案，
+  // 逐檔讀 header 會讓其他來源的匯入變慢。
+  async detectSet(entries) {
     const str = entries.find(e => baseName(e.relPath) === STR_NAME);
-    if (!str?.headerBytes) return false;
+    if (!str) return false;
     try {
-      const h = parseHeader(str.headerBytes);
+      const h = parseHeader(await str.readHeader());
       return h.signalCount > 0 && findSignal(h, "Mask Dur") != null;
     } catch {
       return false;

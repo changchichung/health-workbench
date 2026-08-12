@@ -88,16 +88,33 @@ test("機型字串取自 #PNA，不讀序號", () => {
   assert.equal(parseDeviceModel("#VRN 1\n"), null);
 });
 
-test("多檔判型：有 STR.edf 且通過 EDF 判型才接受", () => {
-  const str = strBytes([day()]);
-  assert.equal(resmedEdfAdapter.detectSet(
-    [{ relPath: "STR.edf", headerBytes: str }]), true);
-  assert.equal(resmedEdfAdapter.detectSet(
-    [{ relPath: "DATALOG/x_SAD.edf", headerBytes: sadBytes([[[], []]]) }]), false,
+test("多檔判型：有 STR.edf 且通過 EDF 判型才接受", async () => {
+  const entry = (relPath, bytes) => ({ relPath, readHeader: async () => bytes });
+  assert.equal(await resmedEdfAdapter.detectSet(
+    [entry("STR.edf", strBytes([day()]))]), true);
+  assert.equal(await resmedEdfAdapter.detectSet(
+    [entry("DATALOG/x_SAD.edf", sadBytes([[[], []]]))]), false,
     "只有 DATALOG 沒有 STR 不接受");
-  assert.equal(resmedEdfAdapter.detectSet(
-    [{ relPath: "STR.edf", headerBytes: new Uint8Array(300) }]), false);
+  assert.equal(await resmedEdfAdapter.detectSet(
+    [entry("STR.edf", new Uint8Array(300))]), false);
   assert.equal(resmedEdfAdapter.detect(), false, "單檔路徑不接受");
+});
+
+test("多檔判型只讀必要的檔：無關檔案不被開啟", async () => {
+  // 資料夾可能含上千個與本 adapter 無關的檔（如 Apple 匯出的
+  // workout-routes）。逐檔讀 header 會讓其他來源的匯入每次都多上千次 IO。
+  let reads = 0;
+  const entry = (relPath, bytes) => ({
+    relPath, readHeader: async () => { reads += 1; return bytes; },
+  });
+  const many = Array.from({ length: 500 },
+    (_, i) => entry(`workout-routes/route${i}.gpx`, new Uint8Array(300)));
+  assert.equal(await resmedEdfAdapter.detectSet(many), false);
+  assert.equal(reads, 0, "沒有 STR.edf 時一個檔都不該讀");
+
+  assert.equal(await resmedEdfAdapter.detectSet(
+    [...many, entry("STR.edf", strBytes([day()]))]), true);
+  assert.equal(reads, 1, "只讀 STR.edf 一個檔");
 });
 
 test("完整匯入：三表筆數與數值正確、每檔一列 source_documents", async () => {

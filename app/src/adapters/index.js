@@ -3,8 +3,10 @@ import { createRegistry } from "./registry.js";
 import { nhiJsonAdapter } from "./nhi_json.js";
 import { nhiXmlAdapter } from "./nhi_xml.js";
 import { appleHealthAdapter } from "./apple_health.js";
+import { resmedEdfAdapter } from "./resmed_edf.js";
 
 export const registry = createRegistry();
 registry.register(nhiJsonAdapter);
 registry.register(nhiXmlAdapter);
 registry.register(appleHealthAdapter);
+registry.register(resmedEdfAdapter);
