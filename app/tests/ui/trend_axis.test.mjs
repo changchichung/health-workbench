@@ -1,7 +1,7 @@
 // 趨勢圖時間軸與區間選擇（change trend-time-axis）。
 // 走與 viewer_render.test.mjs 相同的 vm sandbox 手法：不新增資產模組，
 // 對真渲染出來的 SVG 座標與文字斷言（design D7／D9）。
-// 資料形狀刻意複製使用者真實庫的病灶：體重密集且新鮮、血壓停在 數百天前、
+// 資料形狀刻意複製生產庫實測到的病灶：體重密集且新鮮、血壓停在 數百天前、
 // 檢驗僅 3 筆且含一筆 null 日期、步數逐日。
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -24,7 +24,7 @@ const W = 860, PL = 48, PR = 100, PW = W - PL - PR;
 const day = (n) => n * 864e5;
 const iso = (t) => new Date(t).toISOString().slice(0, 10);
 
-/* 建一顆形狀貼近使用者真實資料的庫 */
+/* 建一顆形狀貼近生產庫實測形狀的庫 */
 async function shapePayload({ nullLabDate = false, staleAll = false,
   latestAfterGenerated = false, weightEveryOtherDay = false, ancientDate = false } = {}) {
   const d = new NodeDriver(path.join(mkdtempSync(path.join(tmpdir(), "mhb-ta-")), "db.sqlite"));
