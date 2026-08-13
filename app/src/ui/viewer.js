@@ -5,6 +5,17 @@
 import { buildPayload } from "../provider/payload.js";
 import { assemble, loadAssets } from "../provider/assemble.js";
 import { localDateISO } from "../engine/values.js";
+import { PROFILE_DATA_TABLES } from "../engine/profiles.js";
+
+// 「這位成員有沒有可檢視的資料」＝任一資料表有列。沿用 PROFILE_DATA_TABLES
+// （成員刪除用的同一份清單，已被 tests/engine/table_coverage.test.mjs 的 DDL
+// 對帳釘住），扣掉來源紀錄本身。
+//
+// 原本硬編成「encounters ＋ apple_records 兩表相加」，於是只有 CPAP 資料的
+// 成員會被判定成沒有資料，檢視頁整片空白且沒有任何錯誤訊息（2026-08-13 實機
+// 走查：把 CPAP 匯給新成員後檢視頁空白）。新增來源時漏改這裡不會有測試轉紅，
+// 所以改成沿用清單而不是再列一份表名。
+const HAS_DATA_TABLES = PROFILE_DATA_TABLES.filter(t => t !== "source_documents");
 
 // 純函式：匯出檔名。檔名不安全字元（含控制字元）代換為底線。
 export function exportFileName(memberName, dateStr) {
@@ -27,7 +38,15 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
   // srcdoc 每次重設都會觸發 load 對新 document 重掛委派，避免累積）
   frame.addEventListener("load", wireExternalLinks);
 
-  // 解析順序：db 同目錄（使用者可自行更新快取，Python 慣例）→ bundle 資源
+  // 解析順序：db 同目錄（使用者可自行更新快取，Python 慣例）→ 沒有就從 bundle
+  // 資源複製一份過去，之後永遠走第一條。
+  //
+  // 原本第二條是「exists(bundled) 為真才回 bundled」，而那個探測在 dev 模式會
+  // 失敗並被 catch 吞成 null（2026-08-13 實機：檔案確實在
+  // target/debug/resources/ 卻拿不到）。後果是靜默降級：payload 少了 drug_zh，
+  // 用藥頁的西藥品項全部落到「診療項目與其他」，畫面只在說明行寫「未建快取」，
+  // 沒人會把那句話跟分類錯誤連起來。改為直接 copyFile（權限已允許），失敗時
+  // 把原因寫進 console 而不是無聲吞掉。
   async function drugCachePath() {
     const t = window.__TAURI__;
     const dir = getDbPath().replace(/[/\\][^/\\]+$/, "");
@@ -36,9 +55,12 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
     if (await t.fs.exists(local).catch(() => false)) return local;
     try {
       const bundled = await t.path.resolveResource("resources/drug_items.sqlite");
-      if (await t.fs.exists(bundled)) return bundled;
-    } catch { /* resource 未配置時走 null */ }
-    return null;
+      await t.fs.copyFile(bundled, local);
+      return local;
+    } catch (err) {
+      console.error("[mhb] 用藥品項檔快取取不到，西藥品項將無法辨識：", err);
+      return null;
+    }
   }
 
   function showEmpty() {
@@ -60,11 +82,12 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
     frame.hidden = true;
     emptyEl.textContent = "正在載入資料…";
     emptyEl.hidden = false;
-    const [{ c }] = await driver.select(
-      "SELECT (SELECT count(*) FROM encounters WHERE profile_id=?)"
-      + " + (SELECT count(*) FROM apple_records WHERE profile_id=?) c",
-      [profileId, profileId]);
-    if (c === 0) return showEmpty();
+    // EXISTS 逐表短路：apple_records 有數十萬列，不能用 count(*) 相加
+    const [{ has }] = await driver.select(
+      "SELECT (" + HAS_DATA_TABLES
+        .map(t => `EXISTS(SELECT 1 FROM ${t} WHERE profile_id=?)`).join(" OR ")
+      + ") AS has", HAS_DATA_TABLES.map(() => profileId));
+    if (!has) return showEmpty();
     assets = assets || await loadAssets();
     const payload = await buildPayload(driver, {
       profileId,

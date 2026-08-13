@@ -358,6 +358,24 @@ async function wireUi() {
     }
   });
 
+  // 版本標示（2026-08-13 走查：安裝版與 dev 版共用同一個資料目錄，開錯版本
+  // 會建出舊 schema 的庫而症狀像功能壞掉）。版號兩者相同，光看版號分不出來，
+  // 所以連執行來源一起標：資源路徑落在 target/debug 就是開發版。
+  (async () => {
+    const el = document.getElementById("app-version");
+    if (!el) return;
+    const t = window.__TAURI__;
+    let ver = null, origin = "";
+    try { ver = await t.app.getVersion(); } catch { /* 權限不足時只標來源 */ }
+    try {
+      const res = await t.path.resolveResource("");
+      if (/[/\\]target[/\\]debug[/\\]/.test(res)) origin = "開發版";
+      else if (/[/\\]target[/\\]release[/\\]/.test(res)) origin = "本機建置";
+    } catch { /* 取不到就不標來源 */ }
+    const parts = [ver ? `v${ver}` : null, origin || null].filter(Boolean);
+    el.textContent = parts.length ? `｜${parts.join("・")}` : "";
+  })();
+
   // 原生拖放（Tauri drag-drop 事件；HTML5 drop 在 Tauri 內拿不到路徑）
   const { listen } = window.__TAURI__.event;
   await listen("tauri://drag-enter", () => document.body.classList.add("dragover"));
