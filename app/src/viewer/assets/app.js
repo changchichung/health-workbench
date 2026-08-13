@@ -645,6 +645,26 @@
     }
     const oxi = CPAP.oximetry || [];
     const events = CPAP.events || [];
+    // 每晚事件數用 event_daily（每晚 × 類型的計數）：它不受逐筆保留範圍
+    // 影響，資料量再大都畫得完。中文標籤與色票沿用 AHI 分項圖，未分類另給
+    // 一色（AHI 圖的主線色，該圖沒有主線）。
+    const EVENT_ZH = { "Obstructive Apnea": "阻塞", "Central Apnea": "中樞",
+      "Hypopnea": "低通氣", "Apnea": "未分類" };
+    const EVENT_COLOR = { "Obstructive Apnea": "var(--s1)",
+      "Central Apnea": "var(--s2)", "Hypopnea": "var(--s4)",
+      "Apnea": "var(--s3)" };
+    const nightlyEventSeries = Object.keys(EVENT_ZH)
+      .map((t) => ({ label: EVENT_ZH[t], color: EVENT_COLOR[t],
+        points: (CPAP.event_daily || [])
+          .filter((r) => r.event_type === t).map((r) => [r.date, r.n]) }))
+      .filter((s) => s.points.length);
+    // 逐筆依晚分組（payload 的 events 已依 start_ts 遞增，同一晚必相鄰）
+    const eventsByNight = [];
+    for (const e of events) {
+      const last = eventsByNight[eventsByNight.length - 1];
+      if (last && last.date === e.session_date) last.rows.push(e);
+      else eventsByNight.push({ date: e.session_date, rows: [e] });
+    }
     const devices = [...new Set(CPAP_DAILY.map((r) => r.device))].filter(Boolean);
     const nights = CPAP_DAILY.length;
     const usageSeries = [{ label: "使用時數", color: "var(--s1)",
@@ -687,17 +707,30 @@
               { label: "平均", color: "var(--s1)", points: oxi.map((r) => [r.date, r.spo2_mean]) },
             ]} />`
         : html`<p class="note">此來源沒有血氧資料。血氧需要機器外接血氧模組才會記錄。</p>`}
-      <h2>呼吸事件${CPAP.events_truncated ? `（共 ${CPAP.events_total} 筆，以下列最近 ${events.length} 筆）` : `（${events.length} 筆）`}</h2>
-      ${events.length
-        ? html`<table><tr><th>入睡日</th><th>時刻</th><th>類型</th><th>持續</th></tr>
-            ${events.slice().reverse().slice(0, 300).map((e) => html`<tr>
-              <td class="dt">${e.session_date}</td>
-              <td class="dt">${(e.start_ts || "").slice(11, 19)}</td>
-              <td>${e.event_type}</td>
-              <td class="num">${e.duration_sec != null ? `${e.duration_sec} 秒` : "—"}</td></tr>`)}
-          </table>
-          ${events.length > 300 && html`<p class="note">表格僅列最近 300 筆，圖表仍涵蓋全部區間。</p>`}`
+      <h2>每晚事件數</h2>
+      ${nightlyEventSeries.length
+        ? html`<${LineChart} unit="筆" series=${nightlyEventSeries} domain=${dom}
+            onShowAll=${showAll} rangeLabel=${rangeLabel}
+            note="每晚各類型的事件筆數，涵蓋全部有紀錄的夜晚" />`
         : html`<p class="note">此來源沒有逐次事件紀錄（僅有每日摘要）。</p>`}
+      <h2>逐筆事件紀錄${eventsByNight.length ? `（${events.length} 筆，分 ${eventsByNight.length} 晚）` : ""}</h2>
+      ${eventsByNight.length
+        ? html`<div>
+            ${CPAP.events_truncated
+              ? html`<p class="note">逐筆僅保留最近 ${CPAP.events_nights} 晚
+                  （共 ${CPAP.events_nights_total} 晚有事件）；較早的夜晚仍有
+                  每日摘要與上方的每晚事件數。</p>`
+              : ""}
+            ${eventsByNight.slice().reverse().map((n) => html`<details>
+              <summary>${n.date}（${n.rows.length} 筆）</summary>
+              <table><tr><th>時刻</th><th>類型</th><th>持續</th></tr>
+                ${n.rows.map((e) => html`<tr>
+                  <td class="dt">${(e.start_ts || "").slice(11, 19)}</td>
+                  <td>${e.event_type}</td>
+                  <td class="num">${e.duration_sec != null ? `${e.duration_sec} 秒` : "—"}</td></tr>`)}
+              </table></details>`)}
+          </div>`
+        : ""}
     </section>`;
   }
 

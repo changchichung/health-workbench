@@ -16,10 +16,19 @@ const TABLES = ["profiles", "source_documents", "encounters", "medications",
   "cancer_screenings", "apple_records", "apple_workouts",
   "cpap_daily", "cpap_events", "cpap_oximetry"];
 
-// CPAP 逐筆事件的 payload 上限。Phase 1 實測不足三百筆，但 Phase 2 帶進
-// 數年資料後可能上萬，而 payload 會嵌進單檔 HTML。超過時只帶最近的，
-// 並在 meta 標明被截斷（UI MUST 據此顯示「僅列最近 N 筆」，不可靜默截斷）。
-const CPAP_EVENT_LIMIT = 2000;
+// CPAP 逐筆事件的 payload 上限，以**晚**為單位而非筆數（change
+// viewer-and-history-refinement D3）。按筆數切會落在某一晚的中間，那晚只剩
+// 一半事件而畫面上看不出被截斷；按晚切則任一晚要嘛完整、要嘛不在 payload。
+// 晚數取 90（約三個月，涵蓋一般回診間隔）；筆數硬上限防的是每晚上百筆的
+// 極端使用者（只設晚數時 90 晚可能達 1.5 萬筆／1.6 MB）。超過筆數上限時
+// **從最舊的晚整晚剔除**，不切半晚。
+// 實測依據（2026-08-13）：每筆 110 bytes；本機密度 十餘筆/晚 → 90 晚約
+// 163 KB，最壞 59 筆/晚 → 571 KB，佔 assemble 的 10 MB 上限 5.7%。
+// UI MUST 依 events_truncated 揭露保留範圍，不可靜默截斷。
+// 與 src/dashboard/embed.py 的同名常數必須同值（tests/provider/
+// cpap_event_limit_parity.test.mjs 釘住）。
+export const CPAP_EVENT_NIGHTS = 90;
+export const CPAP_EVENT_ROWS_CAP = 8000;
 
 // CPAP 區塊（design D10）。逐分鐘血氧不進 payload：Phase 1 沒有資料，
 // Phase 2 帶進數年逐分鐘會是數十萬列。改帶每晚彙總，趨勢圖要的正是這個。
@@ -35,10 +44,31 @@ async function cpapBlock(driver, profileId) {
     GROUP BY session_date, event_type ORDER BY session_date, event_type`, [profileId]);
   const [{ total }] = await driver.select(
     "SELECT COUNT(*) AS total FROM cpap_events WHERE profile_id=?", [profileId]);
-  const events = await driver.select(`
-    SELECT session_date, start_ts, duration_sec, event_type
-    FROM cpap_events WHERE profile_id=?
-    ORDER BY start_ts DESC LIMIT ?`, [profileId, CPAP_EVENT_LIMIT]);
+  const [{ nights_total: nightsTotal }] = await driver.select(
+    "SELECT COUNT(DISTINCT session_date) AS nights_total FROM cpap_events"
+    + " WHERE profile_id=?", [profileId]);
+  // 先取最近 N 個**有事件的**晚（不是日曆晚：本機 數百晚只有 17 晚有事件），
+  // 再取這些晚的全部事件，最後在 JS 端依筆數硬上限從最舊的晚整晚剔除。
+  const nightRows = await driver.select(`
+    SELECT session_date FROM cpap_events WHERE profile_id=?
+    GROUP BY session_date ORDER BY session_date DESC LIMIT ?`,
+    [profileId, CPAP_EVENT_NIGHTS]);
+  const nights = nightRows.map(r => r.session_date).sort();
+  let events = [];
+  if (nights.length) {
+    const ph = nights.map(() => "?").join(",");
+    events = await driver.select(`
+      SELECT session_date, start_ts, duration_sec, event_type
+      FROM cpap_events WHERE profile_id=? AND session_date IN (${ph})
+      ORDER BY start_ts`, [profileId, ...nights]);
+  }
+  // 筆數硬上限：從最舊的晚整晚移除，直到不超過上限。剔到只剩一晚仍超過時
+  // 保留那一晚（寧可帶一晚完整資料，也不切成半晚）。
+  const keptNights = [...nights];
+  while (events.length > CPAP_EVENT_ROWS_CAP && keptNights.length > 1) {
+    const drop = keptNights.shift();
+    events = events.filter(e => e.session_date !== drop);
+  }
   // 每晚彙總：整晚最低血氧與平均，供跨日趨勢。以 SQL 的 ROUND 計算而非
   // 在兩種語言各自實作四捨五入（provider_parity 是全等比對）。
   const oximetry = await driver.select(`
@@ -51,9 +81,11 @@ async function cpapBlock(driver, profileId) {
   return {
     daily: daily.map(r => ({ ...r })),
     event_daily: eventDaily.map(r => ({ ...r })),
-    events: events.map(r => ({ ...r })).reverse(),
+    events: events.map(r => ({ ...r })),
     events_total: total,
-    events_truncated: total > CPAP_EVENT_LIMIT,
+    events_nights: keptNights.length,
+    events_nights_total: nightsTotal,
+    events_truncated: keptNights.length < nightsTotal,
     oximetry: oximetry.map(r => ({ ...r })),
   };
 }

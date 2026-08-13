@@ -20,6 +20,7 @@
     "workouts": { "type": "array" },
     "cpap": { "type": "object",
       "required": ["daily", "event_daily", "events", "events_total",
-        "events_truncated", "oximetry"] }
+        "events_nights", "events_nights_total", "events_truncated",
+        "oximetry"] }
   }
 }

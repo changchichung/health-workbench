@@ -141,12 +141,18 @@ test("有 CPAP 資料：分頁出現，各區塊渲染成功且不落入錯誤�
   const text = root.textContent;
   assert.ok(!text.includes("分頁載入失敗"), `落入錯誤邊界：${text.slice(0, 200)}`);
   for (const marker of ["每晚 AHI", "使用時數", "漏氣（95 百分位）",
-    "送氣壓力（95 百分位）", "睡眠期血氧", "呼吸事件"]) {
+    "送氣壓力（95 百分位）", "睡眠期血氧", "每晚事件數", "逐筆事件紀錄"]) {
     assert.ok(text.includes(marker), `缺區塊「${marker}」`);
   }
   assert.ok(text.includes("S9_AutoSet"), "顯示機型");
   assert.ok(text.includes("日期為入睡當晚"), "標注日期語意（正午邊界）");
-  assert.ok(text.includes("Obstructive Apnea"), "事件明細表列出事件");
+  assert.ok(text.includes("Obstructive Apnea"), "逐筆明細列出事件類型");
+  // 逐筆改為按晚摺疊（D4）：每晚一個 details，summary 帶日期與該晚筆數
+  const summaries = findAll(root, (el) => el.localName === "summary")
+    .map((el) => el.textContent);
+  assert.ok(summaries.length > 0, "逐筆事件必須以每晚一個摺疊小節呈現");
+  assert.ok(summaries.every((s) => /\d{4}-\d{2}-\d{2}（\d+ 筆）/.test(s)),
+    `摺疊標題需含日期與該晚筆數：${JSON.stringify(summaries)}`);
   // 折線有實際座標（不是空圖）
   const circles = findAll(root, (el) => el.localName === "circle");
   const polylines = findAll(root, (el) => el.localName === "polyline");

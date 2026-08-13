@@ -42,8 +42,12 @@ def daily_measure_series(store, type_zh):
     return [[d, round(sorted(vs)[len(vs) // 2], 2)] for d, vs in sorted(buckets.items())]
 
 
-# 與 app/src/provider/payload.js 的 CPAP_EVENT_LIMIT 同值
-CPAP_EVENT_LIMIT = 2000
+# 與 app/src/provider/payload.js 的同名常數同值（以晚為單位而非筆數，理由與
+# 實測依據見那邊的註解）。兩邊不同值時，provider 同構測試只在資料量觸及較小
+# 的那個上限時才會顯現差異，所以另有常數比對守衛
+# （app/tests/provider/cpap_event_limit_parity.test.mjs）。
+CPAP_EVENT_NIGHTS = 90
+CPAP_EVENT_ROWS_CAP = 8000
 
 
 def build_payload(store, db_path):
@@ -119,9 +123,25 @@ def build_payload(store, db_path):
         FROM cpap_events GROUP BY session_date, event_type
         ORDER BY session_date, event_type""")]
     cpap_events_total = con.execute("SELECT COUNT(*) FROM cpap_events").fetchone()[0]
-    cpap_events = [dict(r) for r in con.execute("""
-        SELECT session_date, start_ts, duration_sec, event_type
-        FROM cpap_events ORDER BY start_ts DESC LIMIT ?""", (CPAP_EVENT_LIMIT,))]
+    cpap_nights_total = con.execute(
+        "SELECT COUNT(DISTINCT session_date) FROM cpap_events").fetchone()[0]
+    # 先取最近 N 個「有事件的」晚（不是日曆晚），再取這些晚的全部事件，
+    # 最後依筆數硬上限從最舊的晚整晚剔除。語意與 payload.js 一致。
+    cpap_nights = sorted(r[0] for r in con.execute("""
+        SELECT session_date FROM cpap_events
+        GROUP BY session_date ORDER BY session_date DESC LIMIT ?""",
+        (CPAP_EVENT_NIGHTS,)))
+    cpap_events = []
+    if cpap_nights:
+        ph = ",".join("?" * len(cpap_nights))
+        cpap_events = [dict(r) for r in con.execute(f"""
+            SELECT session_date, start_ts, duration_sec, event_type
+            FROM cpap_events WHERE session_date IN ({ph})
+            ORDER BY start_ts""", tuple(cpap_nights))]
+    kept_nights = list(cpap_nights)
+    while len(cpap_events) > CPAP_EVENT_ROWS_CAP and len(kept_nights) > 1:
+        drop = kept_nights.pop(0)
+        cpap_events = [e for e in cpap_events if e["session_date"] != drop]
     cpap_oximetry = [dict(r) for r in con.execute("""
         SELECT session_date AS date,
                MIN(spo2_min) AS spo2_min, ROUND(AVG(spo2_mean), 1) AS spo2_mean,
@@ -131,9 +151,11 @@ def build_payload(store, db_path):
     cpap = {
         "daily": cpap_daily,
         "event_daily": cpap_event_daily,
-        "events": list(reversed(cpap_events)),
+        "events": cpap_events,
         "events_total": cpap_events_total,
-        "events_truncated": cpap_events_total > CPAP_EVENT_LIMIT,
+        "events_nights": len(kept_nights),
+        "events_nights_total": cpap_nights_total,
+        "events_truncated": len(kept_nights) < cpap_nights_total,
         "oximetry": cpap_oximetry,
     }
 
