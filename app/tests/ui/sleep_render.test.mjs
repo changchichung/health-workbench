@@ -247,3 +247,46 @@ test("趨勢頁時間域涵蓋 CPAP 日期（不納入的話新圖會被壓到�
   assert.ok(!without.some(t => t === "2023"),
     "前提不成立：沒有 CPAP 時本來就不該出現 2023 刻度");
 });
+
+// task 6.3：匯出的單檔 HTML 必須涵蓋新區塊。檢視器與匯出共用同一份
+// app.js 與 payload，但仍要驗證組裝後的產物真的帶著它們（契約若被改窄，
+// 或組裝時漏掉區塊，只會在使用者打開匯出檔時才發現）。
+import { assemble, validateShape, SIZE_LIMIT } from "../../src/provider/assemble.js";
+
+test("匯出單檔 HTML：涵蓋 CPAP 區塊且通過契約與體積門檻", async () => {
+  const payload = await cpapPayload({ withOximetry: true });
+  assert.deepEqual(validateShape(payload), [], "payload 不符契約");
+
+  const assets = {
+    appJs: readFileSync(new URL("app.js", ASSETS), "utf-8"),
+    css: readFileSync(new URL("style.css", ASSETS), "utf-8"),
+    vendor: ["preact.min.js", "hooks.umd.js", "htm.umd.js"].map(
+      f => readFileSync(new URL(`vendor/${f}`, ASSETS), "utf-8")),
+  };
+  const html = assemble(payload, assets);
+  assert.ok(html.length < SIZE_LIMIT, "超出單檔體積門檻");
+
+  // 嵌入資料帶著 CPAP（注意 assemble 會跳脫 < > &，故比對鍵名而非整段）
+  const embedded = JSON.parse(
+    html.match(/<script type="application\/json" id="mhb-data">(.*?)<\/script>/s)[1]
+      .replaceAll("\\u003c", "<").replaceAll("\\u003e", ">").replaceAll("\\u0026", "&"));
+  assert.equal(embedded.cpap.daily.length, payload.cpap.daily.length);
+  assert.ok(embedded.cpap.events.length > 0, "匯出檔缺呼吸事件");
+  // 檢視程式碼帶著睡眠分頁
+  assert.ok(html.includes("睡眠呼吸"), "匯出檔的程式碼缺睡眠呼吸分頁");
+  assert.ok(html.includes("此來源沒有血氧資料"), "匯出檔缺血氧空狀態文案");
+});
+
+test("匯出單檔 HTML：沒有 CPAP 資料時仍是合法產物", async () => {
+  const payload = await nhiOnlyPayload();
+  assert.deepEqual(validateShape(payload), [],
+    "沒有 CPAP 資料時 payload 仍須符合契約（cpap 為空區塊而非缺鍵）");
+  const assets = {
+    appJs: readFileSync(new URL("app.js", ASSETS), "utf-8"),
+    css: readFileSync(new URL("style.css", ASSETS), "utf-8"),
+    vendor: ["preact.min.js", "hooks.umd.js", "htm.umd.js"].map(
+      f => readFileSync(new URL(`vendor/${f}`, ASSETS), "utf-8")),
+  };
+  const html = assemble(payload, assets);
+  assert.ok(html.length < SIZE_LIMIT);
+});

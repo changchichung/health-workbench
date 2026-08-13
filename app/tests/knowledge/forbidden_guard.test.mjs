@@ -45,3 +45,22 @@ test("出貨文案無禁用詞（DMG 與 Windows 使用說明）", () => {
   }
   assert.deepEqual(violations, []);
 });
+
+// 雙份 app.js 同步守衛：App 內檢視與 Python rebuild 產出的單檔 HTML 各用
+// 一份，改了一份忘了另一份不會有任何錯誤，只會讓兩條路徑靜默分歧。
+test("兩份 app.js 逐位元組相同（App 檢視層與匯出層）", () => {
+  const a = readFileSync(path.join(REPO, "app/src/viewer/assets/app.js"), "utf-8");
+  const b = readFileSync(path.join(REPO, "src/dashboard/app.js"), "utf-8");
+  assert.equal(a, b,
+    "app/src/viewer/assets/app.js 與 src/dashboard/app.js 不一致，請同步");
+});
+
+test("出貨文案與檢視層文案：CPAP 指標只顯示不解讀", () => {
+  // 禁用詞清單擋的是既有的判定性措辭。這裡另外確認 CPAP 相關文案沒有
+  // 引入新的解讀性用語（嚴重度、是否達標、要不要就醫等）。
+  const app = readFileSync(path.join(REPO, "app/src/viewer/assets/app.js"), "utf-8");
+  const INTERPRETIVE = ["偏高", "偏低", "過高", "過低", "嚴重", "輕微", "達標",
+    "未達標", "需就醫", "建議就醫", "控制良好", "控制不佳", "正常範圍"];
+  const hits = INTERPRETIVE.filter(w => app.includes(w));
+  assert.deepEqual(hits, [], `檢視層出現解讀性用語：${hits.join("、")}`);
+});
