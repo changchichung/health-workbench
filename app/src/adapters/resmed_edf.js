@@ -31,7 +31,7 @@ const IDENT_NAME = "Identification.tgt";
 
 // 每日摘要的欄位映射：STR.edf 的訊號標籤 → cpap_daily 欄位。
 // 標籤用檔案中實際出現的字串（label 欄位僅 16 字元，長標籤已被來源截斷）。
-// 治療壓力（機器輸出）進主要欄位，面罩壓力與吐氣壓力進 extra_json：
+// 送氣壓力（機器輸出）進主要欄位，面罩壓力與吐氣壓力進 extra_json：
 // 主要欄位只放兩台機器共通的臨床量，不長成 ResMed 的形狀（proposal 約束）。
 const DAILY_MAP = {
   "Mask Dur": "usage_min",
@@ -78,7 +78,7 @@ const OXI_COLS = ["profile_id", "doc_id", "device", "session_date",
 // 非事件的 annotation：標記錄製起點，不是呼吸事件（design 格式事實 4）
 const NON_EVENT_LABELS = new Set(["Recording starts"]);
 
-// 正午邊界（design D4）：一個「治療夜」自正午起算，因此起始時刻在正午前
+// 正午邊界（design D4）：一個「紀錄夜」自正午起算，因此起始時刻在正午前
 // 者屬於前一天。STR 的每日摘要與 DATALOG 的事件／血氧共用這條規則，
 // 不可改用檔名日期（午夜後就寢會與摘要差一天且無錯誤訊息）。
 export function sessionDateOf(start) {

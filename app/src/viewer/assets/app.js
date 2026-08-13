@@ -664,7 +664,7 @@
       </div>
       <${LineChart} unit="次/小時" series=${ahiSeries} domain=${dom}
         onShowAll=${showAll} rangeLabel=${rangeLabel}
-        note="日期為入睡當晚（一個治療夜自正午起算）" />
+        note="日期為入睡當晚（機器以正午為分界劃分一晚）" />
       <h2>使用時數</h2>
       <${LineChart} unit="小時" series=${usageSeries} domain=${dom}
         onShowAll=${showAll} rangeLabel=${rangeLabel}
@@ -672,7 +672,7 @@
       <h2>漏氣（95 百分位）</h2>
       <${LineChart} unit="L/s" domain=${dom} onShowAll=${showAll} rangeLabel=${rangeLabel}
         series=${[{ label: "漏氣", color: "var(--s2)", points: cpapSeries("leak_95") }]} />
-      <h2>治療壓力（95 百分位）</h2>
+      <h2>送氣壓力（95 百分位）</h2>
       ${/* 與漏氣分成兩張圖而非疊在一起：兩者單位與數量級都不同（漏氣約
            0-1 L/s、壓力約 6-8 cmH2O），LineChart 只有單一 y 軸，疊在一起
            會把漏氣線壓成貼底的平線。同 design D10 否決雙軸圖的理由。 */""}

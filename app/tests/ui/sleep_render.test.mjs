@@ -141,7 +141,7 @@ test("有 CPAP 資料：分頁出現，各區塊渲染成功且不落入錯誤�
   const text = root.textContent;
   assert.ok(!text.includes("分頁載入失敗"), `落入錯誤邊界：${text.slice(0, 200)}`);
   for (const marker of ["每晚 AHI", "使用時數", "漏氣（95 百分位）",
-    "治療壓力（95 百分位）", "睡眠期血氧", "呼吸事件"]) {
+    "送氣壓力（95 百分位）", "睡眠期血氧", "呼吸事件"]) {
     assert.ok(text.includes(marker), `缺區塊「${marker}」`);
   }
   assert.ok(text.includes("S9_AutoSet"), "顯示機型");
