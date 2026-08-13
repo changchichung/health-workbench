@@ -15,6 +15,7 @@ import { nhiJsonAdapter } from "../../src/adapters/nhi_json.js";
 import { resmedEdfAdapter } from "../../src/adapters/resmed_edf.js";
 import { buildPayload } from "../../src/provider/payload.js";
 import { makeDocument, findAll } from "../helpers/mini_dom.mjs";
+import { BATCH_SOURCES } from "../helpers/batch_vector.mjs";
 import { makeEdf, annotationRecord, STR_SIGNALS, SAD_SIGNALS, EVE_SIGNALS }
   from "../helpers/make_edf.mjs";
 
@@ -295,4 +296,37 @@ test("匯出單檔 HTML：沒有 CPAP 資料時仍是合法產物", async () => 
   };
   const html = assemble(payload, assets);
   assert.ok(html.length < SIZE_LIMIT);
+});
+
+// 批次摺疊的檢視層側（change viewer-and-history-refinement D7）：與 App 端的
+// groupDocsByBatch 餵同一組向量。兩份實作必然分開（此處的 groupSources 在
+// IIFE 內、沙箱外取不到，且該檔自包含不能 import），所以用共用向量比對語意。
+test("匯入紀錄批次摺疊：同一組向量在檢視層得到相同分組與合計", async () => {
+  const payload = await cpapPayload();
+  payload.meta.sources = BATCH_SOURCES;
+  const { root, flush } = renderViewer(payload);
+  await flush();
+  const text = root.textContent;
+
+  // 多檔批各自摺疊成一列；單檔批直接顯示檔名（不產生 summary）
+  const summaries = findAll(root, (el) => el.localName === "summary")
+    .map((el) => el.textContent);
+  assert.deepEqual(summaries, ["3 個檔案", "2 個檔案"],
+    `多檔批必須各摺疊為一列，實際：${JSON.stringify(summaries)}`);
+  assert.ok(text.includes("輸出.xml"), "單檔批直接顯示檔名");
+  assert.ok(text.includes("健康存摺醫療類_1.json"), "單檔批（缺統計）也要列出");
+
+  // 逐檔仍在 DOM（payload 保留逐檔追溯，摺疊只做在檢視層）
+  assert.ok(text.includes("DATALOG/20230612_EVE.edf"));
+  assert.ok(text.includes("DATALOG/20230701_EVE.edf"));
+
+  // 合計＝組內加總，與 App 端 EXPECTED_BATCHES 的 inserted／dupTotal 對齊：
+  // 批 A 的 cpap_events 是 286+27+14=327，重複略過 214
+  assert.ok(text.includes("呼吸事件 +327"),
+    "第一批的事件合計必須是組內加總（286+27+14）");
+  assert.ok(text.includes("重複略過 214"), "重複略過也要合計");
+  assert.ok(text.includes("睡眠每日摘要 +259"));
+  // 批 D 缺統計：必須看得出來，不能顯示成新增 0 筆
+  assert.ok(text.includes("（早期匯入，無統計）"),
+    "缺統計的批要標示，不得算成 0");
 });

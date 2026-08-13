@@ -76,17 +76,26 @@ class Store:
         return cur.lastrowid, masked_id
 
     # ---- source documents ----
-    def register_source(self, profile_id, filename, sha256, adapter, adapter_version):
-        """回傳 (doc_id, already_imported)。同 sha256 視為已匯入。"""
+    def register_source(self, profile_id, filename, sha256, adapter, adapter_version,
+                        imported_at=None):
+        """回傳 (doc_id, already_imported)。同 sha256 視為已匯入。
+
+        imported_at（選用）語意與 app/src/engine/store.js 的 registerSource 一致：
+        多檔來源要讓整批共用同一個時間戳，否則每列各自取 datetime('now')，跨秒
+        時同一批會被檢視層（同 adapter ＋同 imported_at）切成數批。傳 None 沿用
+        schema 原本的 datetime('now')。回傳值仍是「先前已匯入的時間」，新插入
+        必為 None。
+        """
         cur = self.con.cursor()
         row = cur.execute("SELECT id, imported_at FROM source_documents WHERE sha256=?",
                           (sha256,)).fetchone()
         if row:
             return row["id"], row["imported_at"]
         cur.execute(
-            "INSERT INTO source_documents(profile_id,filename,sha256,adapter,adapter_version)"
-            " VALUES(?,?,?,?,?)",
-            (profile_id, filename, sha256, adapter, adapter_version))
+            "INSERT INTO source_documents(profile_id,filename,sha256,adapter,"
+            "adapter_version,imported_at)"
+            " VALUES(?,?,?,?,?,COALESCE(?, datetime('now')))",
+            (profile_id, filename, sha256, adapter, adapter_version, imported_at))
         return cur.lastrowid, None
 
     def finalize_import(self, doc_id):

@@ -43,6 +43,19 @@ async function seedMember(driver, pid, tag) {
     "INSERT INTO apple_workouts(profile_id,doc_id,activity,start_ts,end_ts)"
     + " VALUES(?,?,?,?,?)", [pid, docId, "跑步", `2026-01-01T00:00:0${pid}`,
       "2026-01-01T01:00:00"]);
+  // CPAP 三表：doc_id 有 REFERENCES source_documents，若清單漏了它們，
+  // 刪除成員會在 DELETE source_documents 那步 FK 失敗（2026-08-13 實測）
+  await driver.execute(
+    "INSERT INTO cpap_daily(profile_id,doc_id,device,summary_date,ahi)"
+    + " VALUES(?,?,?,?,?)", [pid, docId, `Dev-${tag}`, "2023-06-12", 2.4]);
+  await driver.execute(
+    "INSERT INTO cpap_events(profile_id,doc_id,device,session_date,start_ts,event_type)"
+    + " VALUES(?,?,?,?,?,?)", [pid, docId, `Dev-${tag}`, "2023-06-12",
+      "2023-06-12T20:00:00", "Apnea"]);
+  await driver.execute(
+    "INSERT INTO cpap_oximetry(profile_id,doc_id,device,session_date,minute_ts,"
+    + "spo2_min,sample_count) VALUES(?,?,?,?,?,?,?)",
+    [pid, docId, `Dev-${tag}`, "2023-06-12", "2023-06-12T20:00:00", 95, 60]);
   return docId;
 }
 
@@ -102,7 +115,7 @@ test("renameProfile：改名成功、資料歸屬不變；重名拒絕；改成�
   await d.close();
 });
 
-test("deleteProfile：連帶清除十表、他成員逐位元組不變", async () => {
+test("deleteProfile：連帶清除全部資料表、他成員逐位元組不變", async () => {
   const d = await freshDb();
   const a = await createProfile(d, "本人");
   const b = await createProfile(d, "媽媽");
@@ -167,5 +180,25 @@ test("profileCounts：回報各類筆數（刪除確認面板用）", async () =
   await seedMember(d, a, "a");
   const counts = await profileCounts(d, a);
   for (const t of PROFILE_DATA_TABLES) assert.equal(counts[t], 1, t);
+  await d.close();
+});
+
+// 成員刪除必須連帶清除 CPAP 三表（change viewer-and-history-refinement）。
+// 2026-08-13 實測：PROFILE_DATA_TABLES 漏了三表時，DELETE source_documents
+// 會 FOREIGN KEY constraint failed，含 CPAP 資料的成員完全刪不掉。
+test("deleteProfile：含 CPAP 資料的成員可刪除，三表一併清空", async () => {
+  const d = await freshDb();
+  const a = await createProfile(d, "本人");
+  await seedMember(d, a, "a");
+  const before = await profileCounts(d, a);
+  for (const t of ["cpap_daily", "cpap_events", "cpap_oximetry"]) {
+    assert.equal(before[t], 1, `刪除前確認 ${t} 有資料，否則此測試恆真`);
+  }
+  await deleteProfile(d, a);
+  for (const t of ["cpap_daily", "cpap_events", "cpap_oximetry",
+    "source_documents", "profiles"]) {
+    const [{ c }] = await d.select(`SELECT count(*) c FROM ${t}`);
+    assert.equal(c, 0, `${t} 應已清空`);
+  }
   await d.close();
 });

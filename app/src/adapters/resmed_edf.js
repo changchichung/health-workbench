@@ -307,6 +307,10 @@ export const resmedEdfAdapter = {
 
     return driver.transaction(async (d) => {
       const store = new EngineStore(d);
+      // 整批共用一個時間戳：檢視層以「同 adapter ＋同 imported_at」判定批次，
+      // 逐列各自取 datetime('now') 會在跨秒時把同一批切成數批（D2）。
+      const [{ ts: batchImportedAt }] = await d.select(
+        "SELECT datetime('now') AS ts");
       const perFile = [];
       let readBytes = 0, processed = 0;
       let skippedUnused = 0, oversize = 0, parseErrors = 0;
@@ -325,7 +329,7 @@ export const resmedEdfAdapter = {
         }
         const sha = sha256Of(bytes);
         const reg = await store.registerSource(pid, entry.relPath, sha,
-          ADAPTER_ID, ADAPTER_VERSION);
+          ADAPTER_ID, ADAPTER_VERSION, batchImportedAt);
         if (reg.importedAt) {
           dupFiles += 1;
           perFile.push({ file: entry.relPath, status: "duplicate", rows: 0 });

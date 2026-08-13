@@ -317,3 +317,48 @@ test("匯入失敗全庫回滾：缺 profileId 零寫入", async () => {
   assert.equal(s, 0, "來源列也不得留下");
   await d.close();
 });
+
+// 批次時間戳（change viewer-and-history-refinement D2）：檢視層以
+// 「同 adapter ＋同 imported_at」判定批次，多檔來源必須整批共用一個時間戳。
+test("多檔匯入：整批共用同一個 imported_at", async () => {
+  const { d, pid } = await setup();
+  const entries = [
+    { relPath: "Identification.tgt", source: textSource(IDENT, "Identification.tgt") },
+    { relPath: "STR.edf", source: memSource(strBytes([day(), day({ ahi: 25 })]), "STR.edf") },
+    { relPath: "DATALOG/20230612_203533_EVE.edf",
+      source: memSource(eveBytes([
+        { onset: 115, duration: 11, label: "Obstructive Apnea" }]), "e1.edf") },
+    { relPath: "DATALOG/20230613_202627_EVE.edf",
+      source: memSource(eveBytes([
+        { onset: 200, duration: 9, label: "Central Apnea" }]), "e2.edf") },
+  ];
+
+  // 機制層斷言：攔截 INSERT 的參數，確認每一列都帶了同一個非 null 時間戳。
+  // 只看結果層（COUNT(DISTINCT imported_at)）在插入夠快時會假綠——逐列各自
+  // 取 datetime('now') 也可能落在同一秒。
+  const inserts = [];
+  const spy = Object.create(d);
+  spy.execute = (sql, params) => {
+    if (/INSERT INTO source_documents/.test(sql)) inserts.push(params);
+    return d.execute(sql, params);
+  };
+  spy.transaction = (fn) => NodeDriver.prototype.transaction.call(d, () => fn(spy));
+
+  await resmedEdfAdapter.importSourceSet(
+    { rootName: "resmed", entries }, spy, null, { profileId: pid });
+
+  assert.equal(inserts.length, 3, "STR 與兩個 EVE 各一列（Identification 不建列）");
+  const stamps = inserts.map((p) => p[5]);
+  assert.ok(stamps.every((s) => s != null),
+    `每列都必須帶入批次時間戳，實際：${JSON.stringify(stamps)}`);
+  assert.equal(new Set(stamps).size, 1, "整批必須是同一個時間戳");
+  assert.match(stamps[0], /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+    "格式必須與 schema 預設的 datetime('now') 一致");
+
+  // 結果層：庫裡確實只有一個 imported_at
+  const [{ n }] = await d.select(
+    "SELECT COUNT(DISTINCT imported_at) AS n FROM source_documents WHERE adapter=?",
+    ["resmed_edf"]);
+  assert.equal(n, 1);
+  await d.close();
+});

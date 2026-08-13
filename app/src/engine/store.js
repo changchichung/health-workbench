@@ -16,7 +16,18 @@ export class EngineStore {
 
   // sha256 為全庫 UNIQUE：命中時 JOIN profiles 一次帶回原歸屬成員
   // （跨成員重複檔訊息用，design D2），未命中時 origin 兩欄為 null。
-  async registerSource(profileId, filename, sha256, adapter, adapterVersion) {
+  //
+  // importedAt（選用）：多檔來源要讓整批共用同一個時間戳，否則每列各自取
+  // datetime('now')，批次一大或機器一慢就會跨秒，而檢視層是用
+  // 「同 adapter ＋同 imported_at」判定批次的（change
+  // viewer-and-history-refinement D2）。傳 null 時沿用 schema 原本的
+  // datetime('now')，單檔 adapter 因此不需要改：一批一檔，逐列時間即批次時間。
+  // 值由資料庫時鐘產生，格式必然與既有資料一致，不必在兩種語言各自格式化。
+  //
+  // 回傳的 importedAt 語意不變＝「這個檔**先前**已匯入的時間」，新插入必為
+  // null。呼叫端以它判定重複檔，NEVER 改成回傳剛寫入的值。
+  async registerSource(profileId, filename, sha256, adapter, adapterVersion,
+    importedAt = null) {
     const rows = await this.driver.select(
       "SELECT d.id, d.imported_at, d.profile_id, p.display_name"
       + " FROM source_documents d JOIN profiles p ON d.profile_id = p.id"
@@ -26,8 +37,9 @@ export class EngineStore {
         originProfileId: rows[0].profile_id, originDisplayName: rows[0].display_name };
     }
     const r = await this.driver.execute(
-      "INSERT INTO source_documents(profile_id,filename,sha256,adapter,adapter_version)"
-      + " VALUES(?,?,?,?,?)", [profileId, filename, sha256, adapter, adapterVersion]);
+      "INSERT INTO source_documents(profile_id,filename,sha256,adapter,adapter_version,"
+      + "imported_at) VALUES(?,?,?,?,?,COALESCE(?, datetime('now')))",
+      [profileId, filename, sha256, adapter, adapterVersion, importedAt]);
     return { docId: r.lastInsertRowid, importedAt: null,
       originProfileId: null, originDisplayName: null };
   }

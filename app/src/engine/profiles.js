@@ -3,9 +3,15 @@
 // 順序照 FK 反向（medications 引用 encounters、各表引用 source_documents）。
 
 // 刪除與計數的資料表清單（不含 profiles 本身）；順序即刪除順序。
+// 一位成員名下的全部資料表。新增資料表 MUST 同步加進這裡，否則刪除成員會在
+// DELETE source_documents 那步 FOREIGN KEY constraint failed（2026-08-13 實測：
+// CPAP change 加了三張表卻沒接上，含 CPAP 資料的成員刪不掉）。
+// 順序有意義：cpap_* 的 doc_id 指向 source_documents，MUST 排在它之前。
+// tests/engine/table_coverage.test.mjs 以 DDL 對帳釘住。
 export const PROFILE_DATA_TABLES = [
   "medications", "encounters", "lab_results", "reports", "immunizations",
   "body_measurements", "cancer_screenings", "apple_records", "apple_workouts",
+  "cpap_daily", "cpap_events", "cpap_oximetry",
   "source_documents",
 ];
 

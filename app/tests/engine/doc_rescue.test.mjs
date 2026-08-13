@@ -11,6 +11,7 @@ import { nhiJsonAdapter } from "../../src/adapters/nhi_json.js";
 import { appleHealthAdapter } from "../../src/adapters/apple_health.js";
 import {
   previewDocRescue, deleteSourceDocument, reattributeSourceDocument,
+  previewBatchRescue, deleteSourceBatch, reattributeSourceBatch,
   DOC_DATA_TABLES,
 } from "../../src/engine/doc_rescue.js";
 
@@ -456,5 +457,172 @@ test("reattribute 中斷：整批回滾，全庫與操作前全等", async () =>
   const s = sabotage(d, /UPDATE source_documents SET profile_id/);
   await assert.rejects(() => reattributeSourceDocument(s, b1, c), /模擬中斷/);
   assertSnapshotEqual(before, await snapshot(d), "改歸屬回滾：");
+  await d.close();
+});
+
+// ---------- CPAP 來源檔的救援（change viewer-and-history-refinement）----------
+// 三個實測到的缺陷：刪除 FK 失敗、改歸屬把資料留在原成員、成員刪除 FK 失敗
+// （後者在 profiles.test.mjs）。CPAP change 新增三張表卻沒接上 doc_rescue。
+
+async function seedCpapDoc(d, pid, { sha = "cpap-1", device = "Dev",
+  date = "2023-06-12", tsSuffix = "20:00:00" } = {}) {
+  const doc = await d.execute(
+    "INSERT INTO source_documents(profile_id,filename,sha256,adapter,adapter_version)"
+    + " VALUES(?,?,?,?,?)", [pid, `${sha}.edf`, sha, "resmed_edf", "1"]);
+  const docId = doc.lastInsertRowid;
+  await d.execute(
+    "INSERT INTO cpap_daily(profile_id,doc_id,device,summary_date,ahi)"
+    + " VALUES(?,?,?,?,?)", [pid, docId, device, date, 2.4]);
+  await d.execute(
+    "INSERT INTO cpap_events(profile_id,doc_id,device,session_date,start_ts,event_type)"
+    + " VALUES(?,?,?,?,?,?)", [pid, docId, device, date, `${date}T${tsSuffix}`, "Apnea"]);
+  await d.execute(
+    "INSERT INTO cpap_oximetry(profile_id,doc_id,device,session_date,minute_ts,"
+    + "spo2_min,sample_count) VALUES(?,?,?,?,?,?,?)",
+    [pid, docId, device, date, `${date}T${tsSuffix}`, 95, 60]);
+  return docId;
+}
+
+const cpapCounts = async (d) => ({
+  daily: (await d.select("SELECT COUNT(*) c FROM cpap_daily"))[0].c,
+  events: (await d.select("SELECT COUNT(*) c FROM cpap_events"))[0].c,
+  oximetry: (await d.select("SELECT COUNT(*) c FROM cpap_oximetry"))[0].c,
+});
+
+test("CPAP 來源檔刪除：三表連帶清除（漏接時 FK 會直接失敗）", async () => {
+  const d = await freshDb();
+  const a = await createProfile(d, "本人");
+  const docId = await seedCpapDoc(d, a);
+  const preview = await previewDocRescue(d, docId);
+  assert.equal(preview.counts.cpap_daily, 1, "預覽必須算到 CPAP 筆數");
+  assert.equal(preview.counts.cpap_events, 1);
+  assert.equal(preview.counts.cpap_oximetry, 1);
+
+  const r = await deleteSourceDocument(d, docId);
+  assert.equal(r.deleted.cpap_daily, 1);
+  assert.equal(r.deleted.cpap_events, 1);
+  assert.equal(r.deleted.cpap_oximetry, 1);
+  assert.deepEqual(await cpapCounts(d), { daily: 0, events: 0, oximetry: 0 });
+  assert.equal((await d.select("SELECT COUNT(*) c FROM source_documents"))[0].c, 0);
+  await d.close();
+});
+
+test("CPAP 來源檔改歸屬：三表跟著搬，不留在原成員", async () => {
+  const d = await freshDb();
+  const a = await createProfile(d, "本人");
+  const b = await createProfile(d, "媽媽");
+  const docId = await seedCpapDoc(d, a);
+
+  const r = await reattributeSourceDocument(d, docId, b);
+  assert.equal(r.moved.cpap_daily, 1, "回報的搬移筆數必須含 CPAP（原本全是 0）");
+  assert.equal(r.moved.cpap_events, 1);
+  assert.equal(r.moved.cpap_oximetry, 1);
+  for (const t of ["cpap_daily", "cpap_events", "cpap_oximetry"]) {
+    const rows = await d.select(`SELECT profile_id FROM ${t}`);
+    assert.deepEqual(rows.map(x => x.profile_id), [b],
+      `${t} 的 profile_id 必須是目標成員，留在原成員等於資料沒搬`);
+  }
+  const [{ profile_id: docOwner }] = await d.select(
+    "SELECT profile_id FROM source_documents WHERE id=?", [docId]);
+  assert.equal(docOwner, b);
+  await d.close();
+});
+
+test("CPAP 改歸屬：與目標既有同去重鍵者合併，其餘搬移", async () => {
+  const d = await freshDb();
+  const a = await createProfile(d, "本人");
+  const b = await createProfile(d, "媽媽");
+  // 目標成員已有同一台機器、同一天的資料（同去重鍵）
+  await seedCpapDoc(d, b, { sha: "cpap-b", device: "Dev", date: "2023-06-12" });
+  // 來源：同鍵一組（會合併）＋不同日一組（會搬移）
+  const docId = await seedCpapDoc(d, a, { sha: "cpap-a", device: "Dev",
+    date: "2023-06-12" });
+  await d.execute(
+    "INSERT INTO cpap_daily(profile_id,doc_id,device,summary_date,ahi)"
+    + " VALUES(?,?,?,?,?)", [a, docId, "Dev", "2023-06-20", 3.1]);
+
+  const preview = await previewDocRescue(d, docId, { targetProfileId: b });
+  assert.equal(preview.merge.perTable.cpap_daily, 1,
+    "同 device＋同 summary_date 的那一列要算成合併");
+
+  const r = await reattributeSourceDocument(d, docId, b);
+  assert.equal(r.merged.cpap_daily, 1, "同鍵者合併（來源列刪除、目標列保留）");
+  assert.equal(r.moved.cpap_daily, 1, "不同日的那列搬移");
+  const daily = (await d.select(
+    "SELECT profile_id, summary_date FROM cpap_daily ORDER BY summary_date"))
+    .map(r => ({ ...r }));
+  assert.deepEqual(daily, [
+    { profile_id: b, summary_date: "2023-06-12" },
+    { profile_id: b, summary_date: "2023-06-20" },
+  ], "目標成員各日期只剩一列，且全部歸屬目標");
+  await d.close();
+});
+
+test("批次刪除：三個 CPAP 檔一次清除，各表合計正確", async () => {
+  const d = await freshDb();
+  const a = await createProfile(d, "本人");
+  const ids = [];
+  for (let i = 0; i < 3; i++) {
+    ids.push(await seedCpapDoc(d, a, { sha: `cpap-${i}`,
+      date: `2023-06-1${i + 2}`, tsSuffix: `2${i}:00:00` }));
+  }
+  const preview = await previewBatchRescue(d, ids);
+  assert.equal(preview.docCount, 3);
+  assert.equal(preview.counts.cpap_daily, 3, "預覽為整批合計");
+  assert.equal(preview.counts.cpap_events, 3);
+
+  const r = await deleteSourceBatch(d, ids);
+  assert.equal(r.docCount, 3);
+  assert.equal(r.deleted.cpap_daily, 3);
+  assert.deepEqual(await cpapCounts(d), { daily: 0, events: 0, oximetry: 0 });
+  assert.equal((await d.select("SELECT COUNT(*) c FROM source_documents"))[0].c, 0);
+  await d.close();
+});
+
+test("批次刪除中途失敗：整批回滾，全庫逐位元組不變", async () => {
+  const d = await freshDb();
+  const a = await createProfile(d, "本人");
+  const ids = [];
+  for (let i = 0; i < 3; i++) {
+    ids.push(await seedCpapDoc(d, a, { sha: `cpap-${i}`,
+      date: `2023-06-1${i + 2}`, tsSuffix: `2${i}:00:00` }));
+  }
+  const before = await snapshot(d);
+
+  // 第 3 次刪 source_documents 時拋錯（手法同 nondestructive.test.mjs）
+  let hits = 0;
+  const sabotaged = Object.create(d);
+  sabotaged.execute = (sql, params) => {
+    if (/DELETE FROM source_documents/.test(sql)) {
+      hits += 1;
+      if (hits === 3) throw new Error("模擬中途故障");
+    }
+    return d.execute(sql, params);
+  };
+  sabotaged.transaction = (fn) =>
+    NodeDriver.prototype.transaction.call(d, () => fn(sabotaged));
+
+  await assert.rejects(() => deleteSourceBatch(sabotaged, ids), /模擬中途故障/);
+  assertSnapshotEqual(before, await snapshot(d), "批次刪除失敗後：");
+  await d.close();
+});
+
+test("批次改歸屬：三個檔的資料一起搬到目標成員", async () => {
+  const d = await freshDb();
+  const a = await createProfile(d, "本人");
+  const b = await createProfile(d, "媽媽");
+  const ids = [];
+  for (let i = 0; i < 3; i++) {
+    ids.push(await seedCpapDoc(d, a, { sha: `cpap-${i}`,
+      date: `2023-06-1${i + 2}`, tsSuffix: `2${i}:00:00` }));
+  }
+  const r = await reattributeSourceBatch(d, ids, b);
+  assert.equal(r.docCount, 3);
+  assert.equal(r.moved.cpap_daily, 3);
+  for (const t of ["cpap_daily", "cpap_events", "cpap_oximetry",
+    "source_documents"]) {
+    const rows = await d.select(`SELECT DISTINCT profile_id FROM ${t}`);
+    assert.deepEqual(rows.map(x => x.profile_id), [b], `${t} 全部歸屬目標成員`);
+  }
   await d.close();
 });
