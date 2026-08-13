@@ -78,14 +78,17 @@ test("超過上限晚數：最舊那晚完全不在 payload，不得有半晚", 
 });
 
 test("觸發筆數硬上限：以整晚為單位剔除，剩下的每晚仍完整", async () => {
-  // 每晚 200 筆 × 90 晚 = 18,000 筆，遠超 8,000 筆硬上限
+  // 每晚 200 筆 × 50 晚 = 10,000 筆，超過 8,000 筆硬上限而晚數仍在上限內，
+  // 因此紅的一定是筆數上限那條路徑。晚數用 CPAP_EVENT_NIGHTS 會造出七萬多列，
+  // 測試要跑數秒且無助於斷言。
   const perNight = 200;
-  const { d, pid } = await dbWithEvents(CPAP_EVENT_NIGHTS, perNight);
+  const nights = 50;
+  assert.ok(nights <= CPAP_EVENT_NIGHTS, "此測試要單獨驗筆數上限，晚數不得先觸發");
+  const { d, pid } = await dbWithEvents(nights, perNight);
   const { cpap } = await payloadOf(d, pid);
   assert.ok(cpap.events.length <= CPAP_EVENT_ROWS_CAP,
     `帶入 ${cpap.events.length} 筆超過硬上限 ${CPAP_EVENT_ROWS_CAP}`);
-  assert.ok(cpap.events_nights < CPAP_EVENT_NIGHTS,
-    "筆數上限應讓保留的晚數少於晚數上限");
+  assert.ok(cpap.events_nights < nights, "筆數上限應讓保留的晚數少於實際晚數");
   const counts = perNightCounts(cpap.events);
   assert.equal(counts.size, cpap.events_nights, "events_nights 要與實際晚數相符");
   assert.ok([...counts.values()].every((n) => n === perNight),
@@ -93,7 +96,8 @@ test("觸發筆數硬上限：以整晚為單位剔除，剩下的每晚仍完�
   assert.equal(cpap.events_truncated, true);
   // 保留的是「最近的」那些晚：最舊的晚必須先被剔除
   const kept = [...counts.keys()].sort();
-  assert.equal(kept.at(-1), "2020-03-30", "最後一晚（最新）必須保留");
+  const [{ mx }] = await d.select("SELECT MAX(session_date) mx FROM cpap_events");
+  assert.equal(kept.at(-1), mx, "最後一晚（最新）必須保留");
   await d.close();
 });
 

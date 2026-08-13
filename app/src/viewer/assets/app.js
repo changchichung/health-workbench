@@ -408,12 +408,31 @@
     const effFac = facilities.includes(fac) ? fac : "";
     const list = DATA.encounters.filter(
       (e) => (!type || e.type === type) && (!effFac || e.facility_name === effFac));
+    // 依年分組（list 已依日期新→舊）：只展開一年，其餘只留年份那一行。就醫
+    // 筆數會隨年份累積，平鋪的話標頭數量線性增長。
+    const byYear = [];
+    for (const e of list) {
+      const y = String(e.date || "").slice(0, 4) || "未知";
+      const last = byYear[byYear.length - 1];
+      if (last && last.year === y) last.items.push(e);
+      else byYear.push({ year: y, items: [e] });
+    }
+    // 預設展開：從搜尋／用藥頁跳轉來的那筆所在年份，否則最近一年。少了這個，
+    // 跳轉目標會落在收起來的年份裡而看不到。
+    const focusYear = focus && focus.enc
+      ? String(list.find((e) => e.id === focus.enc)?.date || "").slice(0, 4)
+      : null;
+    const [openYear, setOpenYear] = useState(focusYear || null);
+    // 篩選改變後原本展開的年份可能已不存在，退回第一年（最近一年）
+    const effYear = byYear.some((y) => y.year === openYear)
+      ? openYear : (byYear[0]?.year ?? null);
     const medById = useMemo(() => {
       const m = {}; DATA.medications.forEach((x) => (m[x.id] = x)); return m;
     }, []);
     useEffect(() => {
       if (focus && focus.enc) {
-        const el = document.querySelector(".event.open");
+        // 年份層也帶 event class，選擇器要排除它才不會捲到年份標頭
+        const el = document.querySelector(".event:not(.yeargroup).open");
         if (el) el.scrollIntoView({ block: "start" });
       }
     }, []);
@@ -429,7 +448,17 @@
         </select>
         <span class="note">${list.length} 筆</span>
       </div>
-      ${list.map((e) => html`<div class="event ${open === e.id ? "open" : ""}">
+      ${byYear.map((y) => html`
+        <div class="event yeargroup ${effYear === y.year ? "open" : ""}">
+          <div class="evhead rowlink"
+            onClick=${() => setOpenYear(effYear === y.year ? null : y.year)}>
+            <b>${y.year} 年</b>
+            <span class="note">${y.items.length} 筆</span>
+            <span class="note" style="margin-left:auto">
+              ${effYear === y.year ? "▴" : "▾"}</span>
+          </div>
+          ${effYear === y.year && html`<div class="evbody">
+      ${y.items.map((e) => html`<div class="event ${open === e.id ? "open" : ""}">
         <div class="evhead rowlink" onClick=${() => setOpen(open === e.id ? null : e.id)}>
           <span class="dt">${e.date}</span> <${Chip} type=${e.type} />
           <b> ${e.facility_name}</b> <span>${e.dx_name || ""}</span>
@@ -448,6 +477,8 @@
             ${e.copay != null ? ` ｜ 部分負擔 ${e.copay} 元 ｜ 健保 ${e.nhi_points} 點` : ""}</p>
         </div>`}
       </div>`)}
+          </div>`}
+        </div>`)}
     </section>`;
   }
 
@@ -632,6 +663,10 @@
     const { today, latest, earliest } = useMemo(trendBounds, []);
     const [range, setRange] = useState(() => defaultRange(today, latest));
     const [breakdown, setBreakdown] = useState(false);
+    // 逐筆事件只在展開那一晚才建 DOM（沿用用藥頁 MedGroup 的作法）。摺疊起來
+    // 也全部渲染的話，上限情境會是 8,000 個 <tr> 掛在頁面上。
+    const [openNight, setOpenNight] = useState(null);
+    const [openYear, setOpenYear] = useState(null);
     const dom = rangeDomain(range, today, earliest);
     const showAll = range === "all" ? null : () => setRange("all");
     const rangeLabel = (RANGES.find(([k]) => k === range) || [])[1];
@@ -664,6 +699,15 @@
       const last = eventsByNight[eventsByNight.length - 1];
       if (last && last.date === e.session_date) last.rows.push(e);
       else eventsByNight.push({ date: e.session_date, rows: [e] });
+    }
+    // 再依年分組：年 → 晚 → 逐筆三層，預設全收。常駐 DOM 只有年份那幾行，
+    // 十年也就十行；沒有這層的話光是晚的標頭就會隨年數線性增長。
+    const nightsByYear = [];
+    for (const n of eventsByNight) {
+      const y = n.date.slice(0, 4);
+      const last = nightsByYear[nightsByYear.length - 1];
+      if (last && last.year === y) last.nights.push(n);
+      else nightsByYear.push({ year: y, nights: [n] });
     }
     const devices = [...new Set(CPAP_DAILY.map((r) => r.device))].filter(Boolean);
     const nights = CPAP_DAILY.length;
@@ -721,14 +765,38 @@
                   （共 ${CPAP.events_nights_total} 晚有事件）；較早的夜晚仍有
                   每日摘要與上方的每晚事件數。</p>`
               : ""}
-            ${eventsByNight.slice().reverse().map((n) => html`<details>
-              <summary>${n.date}（${n.rows.length} 筆）</summary>
-              <table><tr><th>時刻</th><th>類型</th><th>持續</th></tr>
-                ${n.rows.map((e) => html`<tr>
-                  <td class="dt">${(e.start_ts || "").slice(11, 19)}</td>
-                  <td>${e.event_type}</td>
-                  <td class="num">${e.duration_sec != null ? `${e.duration_sec} 秒` : "—"}</td></tr>`)}
-              </table></details>`)}
+            ${nightsByYear.slice().reverse().map((y) => html`
+              <div class="event ${openYear === y.year ? "open" : ""}">
+                <div class="evhead rowlink"
+                  onClick=${() => { setOpenYear(openYear === y.year ? null : y.year);
+                    setOpenNight(null); }}>
+                  <b>${y.year} 年</b>
+                  <span class="note">${y.nights.length} 晚｜
+                    ${y.nights.reduce((a, n) => a + n.rows.length, 0)} 筆</span>
+                  <span class="note" style="margin-left:auto">
+                    ${openYear === y.year ? "▴" : "▾"}</span>
+                </div>
+                ${openYear === y.year && html`<div class="evbody">
+                  ${y.nights.slice().reverse().map((n) => html`
+                    <div class="event ${openNight === n.date ? "open" : ""}">
+                      <div class="evhead rowlink"
+                        onClick=${() => setOpenNight(openNight === n.date ? null : n.date)}>
+                        <b>${n.date}</b>
+                        <span class="note">${n.rows.length} 筆</span>
+                        <span class="note" style="margin-left:auto">
+                          ${openNight === n.date ? "▴" : "▾"}</span>
+                      </div>
+                      ${openNight === n.date && html`<div class="evbody">
+                        <table><tr><th>時刻</th><th>類型</th><th>持續</th></tr>
+                          ${n.rows.map((e) => html`<tr>
+                            <td class="dt">${(e.start_ts || "").slice(11, 19)}</td>
+                            <td>${e.event_type}</td>
+                            <td class="num">${e.duration_sec != null ? `${e.duration_sec} 秒` : "—"}</td>
+                          </tr>`)}
+                        </table></div>`}
+                    </div>`)}
+                </div>`}
+              </div>`)}
           </div>`
         : ""}
     </section>`;

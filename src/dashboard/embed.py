@@ -46,7 +46,7 @@ def daily_measure_series(store, type_zh):
 # 實測依據見那邊的註解）。兩邊不同值時，provider 同構測試只在資料量觸及較小
 # 的那個上限時才會顯現差異，所以另有常數比對守衛
 # （app/tests/provider/cpap_event_limit_parity.test.mjs）。
-CPAP_EVENT_NIGHTS = 90
+CPAP_EVENT_NIGHTS = 365
 CPAP_EVENT_ROWS_CAP = 8000
 
 

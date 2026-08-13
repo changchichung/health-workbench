@@ -147,13 +147,33 @@ test("有 CPAP 資料：分頁出現，各區塊渲染成功且不落入錯誤�
   }
   assert.ok(text.includes("S9_AutoSet"), "顯示機型");
   assert.ok(text.includes("日期為入睡當晚"), "標注日期語意（正午邊界）");
-  assert.ok(text.includes("Obstructive Apnea"), "逐筆明細列出事件類型");
-  // 逐筆改為按晚摺疊（D4）：每晚一個 details，summary 帶日期與該晚筆數
-  const summaries = findAll(root, (el) => el.localName === "summary")
-    .map((el) => el.textContent);
-  assert.ok(summaries.length > 0, "逐筆事件必須以每晚一個摺疊小節呈現");
-  assert.ok(summaries.every((s) => /\d{4}-\d{2}-\d{2}（\d+ 筆）/.test(s)),
-    `摺疊標題需含日期與該晚筆數：${JSON.stringify(summaries)}`);
+  // 逐筆按晚定位（D4）＋**展開才建 DOM**：摺疊起來也全部渲染的話，上限情境
+  // 會有 8,000 個 <tr> 掛在頁面上。此處釘住「預設零逐筆列、展開後才出現」。
+  const timeCell = () => findAll(root, (el) => el.localName === "td"
+    && /^\d{2}:\d{2}:\d{2}$/.test(el.textContent));
+  // mini_dom 走 setAttribute，class 要用 getAttribute 取（沒有 className）
+  const heads = (re) => findAll(root, (el) => el.localName === "div"
+    && String(el.getAttribute?.("class") || "").includes("evhead")
+    && re.test(el.textContent));
+  // 預設全收：只有年份那幾行，沒有晚的標頭也沒有任何逐筆列。少了這層，
+  // 光是晚的標頭就會隨年數線性增長（十年約 3,650 行）。
+  const yearHeads = heads(/^\s*\d{4} 年/);
+  assert.ok(yearHeads.length > 0, "逐筆事件必須先以年分層");
+  assert.ok(yearHeads.every((h) => /\d+ 晚/.test(h.textContent)
+    && /\d+ 筆/.test(h.textContent)), "年份標頭要顯示晚數與筆數");
+  assert.equal(heads(/\d{4}-\d{2}-\d{2}/).length, 0, "未展開年份時不得列出每晚標頭");
+  assert.equal(timeCell().length, 0, "未展開時不得渲染任何逐筆列");
+
+  yearHeads[0].dispatch("click");
+  await flush();
+  const nightHeads = heads(/\d{4}-\d{2}-\d{2}/);
+  assert.ok(nightHeads.length > 0, "展開年份後要列出該年的每一晚");
+  assert.equal(timeCell().length, 0, "展開年份還不該渲染逐筆列");
+
+  nightHeads[0].dispatch("click");
+  await flush();
+  assert.ok(timeCell().length > 0, "展開某一晚後該晚的逐筆列才出現");
+  assert.ok(root.textContent.includes("Obstructive Apnea"), "逐筆明細列出事件類型");
   // 折線有實際座標（不是空圖）
   const circles = findAll(root, (el) => el.localName === "circle");
   const polylines = findAll(root, (el) => el.localName === "polyline");

@@ -19,15 +19,17 @@ const TABLES = ["profiles", "source_documents", "encounters", "medications",
 // CPAP 逐筆事件的 payload 上限，以**晚**為單位而非筆數（change
 // viewer-and-history-refinement D3）。按筆數切會落在某一晚的中間，那晚只剩
 // 一半事件而畫面上看不出被截斷；按晚切則任一晚要嘛完整、要嘛不在 payload。
-// 晚數取 90（約三個月，涵蓋一般回診間隔）；筆數硬上限防的是每晚上百筆的
-// 極端使用者（只設晚數時 90 晚可能達 1.5 萬筆／1.6 MB）。超過筆數上限時
-// **從最舊的晚整晚剔除**，不切半晚。
-// 實測依據（2026-08-13）：每筆 110 bytes；本機密度 十餘筆/晚 → 90 晚約
-// 163 KB，最壞 59 筆/晚 → 571 KB，佔 assemble 的 10 MB 上限 5.7%。
+// 晚數取 365（一年）。原本是 90，理由是「畫面上的晚標頭不能無限長」；檢視層
+// 改成年 → 晚 → 逐筆三層摺疊後那個顧慮消失（常駐 DOM 只有年份那幾行），
+// 於是放寬到一年，讓「回頭看去年同期」做得到。筆數硬上限仍留著，防的是每晚
+// 上百筆的極端使用者。超過筆數上限時**從最舊的晚整晚剔除**，不切半晚。
+// 實測依據（2026-08-13）：每筆 110 bytes；本機密度 十餘筆/晚 → 365 晚約
+// 674 KB，佔 assemble 的 10 MB 上限 6.6%；密度再高就由 8,000 筆上限接手
+// （880 KB 為上界）。
 // UI MUST 依 events_truncated 揭露保留範圍，不可靜默截斷。
 // 與 src/dashboard/embed.py 的同名常數必須同值（tests/provider/
 // cpap_event_limit_parity.test.mjs 釘住）。
-export const CPAP_EVENT_NIGHTS = 90;
+export const CPAP_EVENT_NIGHTS = 365;
 export const CPAP_EVENT_ROWS_CAP = 8000;
 
 // CPAP 區塊（design D10）。逐分鐘血氧不進 payload：Phase 1 沒有資料，

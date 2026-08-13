@@ -117,3 +117,59 @@ test("viewer 錯誤邊界：單頁拋錯只該頁顯示錯誤，其他分頁不�
   await flush();
   assert.ok(root.textContent.includes("資料庫與匯入紀錄"), "換頁未復原");
 });
+
+// 就醫時間軸依年分組（change viewer-and-history-refinement）：就醫筆數隨年份
+// 累積，平鋪的話標頭數量線性增長。只展開一年，其餘只留年份那一行。
+// 跳轉定位是這裡最脆的一段：從搜尋／用藥頁點進來的那筆若落在收起來的年份，
+// 使用者會看到一片沒有目標的清單。
+function payloadWithYears(base) {
+  const p = JSON.parse(JSON.stringify(base));
+  const mk = (id, date) => ({ id, type: "門診", date, facility_name: `院所${id}`,
+    dx_code: null, dx_name: `診斷${id}`, copay: null, nhi_points: null,
+    section: "r1", source_index: id, quality_flags: "", source_file: "t.json" });
+  // 新→舊，與 provider 的 ORDER BY date DESC 一致
+  p.encounters = [mk(901, "2026-05-01"), mk(902, "2026-04-01"),
+    mk(903, "2024-03-01")];
+  p.meds_by_enc = {};
+  p.medications = [];
+  return p;
+}
+
+const yearHeadsOf = (root) => findAll(root, (el) => el.localName === "div"
+  && String(el.getAttribute?.("class") || "").includes("evhead")
+  && /^\s*\d{4} 年/.test(el.textContent));
+
+test("就醫時間軸：依年分組，預設只展開最近一年", async () => {
+  const base = await singleSourcePayload("nhi");
+  const { root, flush } = renderViewer(payloadWithYears(base));
+  await flush();
+  tabButton(root, "就醫時間軸").dispatch("click");
+  await flush();
+
+  const years = yearHeadsOf(root).map((el) => el.textContent.trim());
+  assert.equal(years.length, 2, `應有 2026 與 2024 兩個年份層：${JSON.stringify(years)}`);
+  assert.match(years[0], /2026 年/, "最近一年排在最前");
+  assert.match(years[0], /2 筆/);
+  assert.match(years[1], /2024 年/);
+  const text = root.textContent;
+  assert.ok(text.includes("診斷901"), "最近一年預設展開，其就醫列要出現");
+  assert.ok(!text.includes("診斷903"), "其他年份預設收起，不得渲染其就醫列");
+});
+
+// 註：openYear 初值取自 focus.enc 所在年份，但 focus 是由 App 的 go() 設定的
+// 內部狀態，從外部渲染無法直接注入，因此那條路徑只能實機驗（從搜尋或用藥頁
+// 點一筆舊年份的就醫，時間軸應開在該年並捲到該筆）。此處驗的是同一層保護的
+// 另一半：任一時刻只展開一年，且手動切換能看到其他年的內容。
+test("就醫時間軸：同時只展開一年，切換年份可看到該年就醫列", async () => {
+  const base = await singleSourcePayload("nhi");
+  const { root, flush } = renderViewer(payloadWithYears(base));
+  await flush();
+  tabButton(root, "就醫時間軸").dispatch("click");
+  await flush();
+  const y2024 = yearHeadsOf(root).find((el) => el.textContent.includes("2024"));
+  y2024.dispatch("click");
+  await flush();
+  assert.ok(root.textContent.includes("診斷903"), "展開 2024 後該年的就醫列要出現");
+  assert.ok(!root.textContent.includes("診斷901"),
+    "同時只展開一年，2026 應收起");
+});
