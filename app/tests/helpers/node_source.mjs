@@ -36,9 +36,10 @@ export async function nodeFileSource(filePath, chunkSize = 4 * 1024 * 1024) {
 }
 
 // 資料夾情境：找出非 cda 的 .xml 檔（語意同 Python _xml_source 的 dir 分支）
-export async function resolveAppleDir(dirPath) {
+export async function resolveAppleDirNode(dirPath) {
   const names = (await readdir(dirPath)).filter(
-    n => n.toLowerCase().endsWith(".xml") && !n.toLowerCase().includes("cda")).sort();
+    n => !n.startsWith(".") && n.toLowerCase().endsWith(".xml")
+      && !n.toLowerCase().includes("cda")).sort();
   if (!names.length) return null;
   return path.join(dirPath, names[0]);
 }

@@ -63,6 +63,13 @@ export async function collectDirEntries(fs, dirPath,
     const entries = await fs.readDir(dir).catch(() => []);
     for (const e of entries) {
       if (out.length >= maxEntries) return;
+      // 點開頭的檔案與目錄一律不列舉。三個理由：(1) Tauri 的 fs scope glob
+      // `**` 不匹配 leading dot，stat 這類檔會被權限層拒絕而拋錯（macOS 用
+      // Finder 開過 SD 卡就會留下 .DS_Store）；(2) 它們從來不是健康資料
+      // （.DS_Store、._STR.edf 這種 FAT32 上的 AppleDouble 檔）；(3) 點目錄
+      // （.Spotlight-V100、.fseventsd）含大量檔案，下潛進去只是浪費 maxEntries
+      // 額度。使用者看到的檔案數也因此只算真正的資料檔。
+      if (e.name.startsWith(".")) continue;
       const full = join(dir, e.name);
       const relPath = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory) {
@@ -104,22 +111,29 @@ export async function buildSourceSetTauri(dirPath, entries) {
   return { rootName: name, entries: withSources };
 }
 
-// 資料夾情境：找出非 cda 的 .xml（語意同 tests/helpers 的 resolveAppleDir）。
+// 資料夾情境：找出非 cda 的 .xml（語意同 tests/helpers 的 resolveAppleDirNode）。
 // 頂層找不到時下潛一層子資料夾（使用者常選到外層目錄如 Downloads，
 // 匯出實際在其中的 apple_health_export/；2026-08-10 走查回饋）
 export async function resolveAppleDirTauri(dirPath, depth = 1) {
-  const fs = window.__TAURI__.fs;
+  return resolveAppleDir(window.__TAURI__.fs, dirPath, depth);
+}
+
+// fs 注入版（挑選邏輯獨立可測：cda 排除、點檔案排除、子資料夾優先序）
+export async function resolveAppleDir(fs, dirPath, depth = 1) {
   const sep = dirPath.includes("\\") ? "\\" : "/";
   const join = (name) => `${dirPath}${dirPath.endsWith(sep) ? "" : sep}${name}`;
   const entries = await fs.readDir(dirPath);
+  // 點開頭一律排除，理由同 collectDirEntries：FAT32／exFAT 上的 AppleDouble
+  // 檔（`._輸出.xml`）會排在真檔前面被選中，而 stat 它會被 fs scope 拒絕。
   const names = entries
-    .filter(e => !e.isDirectory && e.name.toLowerCase().endsWith(".xml")
+    .filter(e => !e.isDirectory && !e.name.startsWith(".")
+      && e.name.toLowerCase().endsWith(".xml")
       && !e.name.toLowerCase().includes("cda"))
     .map(e => e.name).sort();
   if (names.length) return join(names[0]);
   if (depth <= 0) return null;
   // 子資料夾優先序：名稱含 apple_health_export 者最先，其餘按名稱排
-  const subdirs = entries.filter(e => e.isDirectory)
+  const subdirs = entries.filter(e => e.isDirectory && !e.name.startsWith("."))
     .map(e => e.name)
     .sort((a, b) => {
       const pa = a.toLowerCase().includes("apple_health_export") ? 0 : 1;
@@ -127,7 +141,7 @@ export async function resolveAppleDirTauri(dirPath, depth = 1) {
       return pa - pb || a.localeCompare(b);
     });
   for (const sub of subdirs) {
-    const found = await resolveAppleDirTauri(join(sub), depth - 1).catch(() => null);
+    const found = await resolveAppleDir(fs, join(sub), depth - 1).catch(() => null);
     if (found) return found;
   }
   return null;

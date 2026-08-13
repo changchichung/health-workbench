@@ -9,7 +9,7 @@ import { initSchema } from "../../src/store/schema.js";
 import { appleHealthAdapter } from "../../src/adapters/apple_health.js";
 import { EngineStore } from "../../src/engine/store.js";
 import { createProfile } from "../../src/engine/profiles.js";
-import { nodeFileSource, resolveAppleDir } from "../helpers/node_source.mjs";
+import { nodeFileSource, resolveAppleDirNode } from "../helpers/node_source.mjs";
 
 const REPO = new URL("../../..", import.meta.url).pathname;
 const FIXTURE = `${REPO}/tests/fixtures/apple_sample.xml`;
@@ -109,11 +109,11 @@ test("zip 匯入：壓縮後匯入結果與 XML 直接匯入等價（含中文�
   assert.deepEqual(zipCounts, xmlCounts);
 });
 
-test("資料夾情境：resolveAppleDir 找到非 cda 的 XML", async () => {
+test("資料夾情境：resolveAppleDirNode 找到非 cda 的 XML", async () => {
   const tmp = mkdtempSync(path.join(tmpdir(), "mhb-dir-"));
   copyFileSync(FIXTURE, path.join(tmp, "export_cda.xml"));
   copyFileSync(FIXTURE, path.join(tmp, "輸出.xml"));
-  const resolved = await resolveAppleDir(tmp);
+  const resolved = await resolveAppleDirNode(tmp);
   assert.equal(path.basename(resolved), "輸出.xml");
 });
 

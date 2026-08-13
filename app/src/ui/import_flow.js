@@ -107,7 +107,28 @@ export function createImportFlow({ getDriver, labEntries, onImported,
     msg.hidden = !text;
   }
 
+  // 對外殼層：判型與準備階段的例外一律轉成畫面上的錯誤卡。沒有這層時
+  // 拖放的 listener（main.js 的 tauri://drag-drop）沒有接手者，例外會變成
+  // 未捕捉的 rejection，畫面完全沒有反應（2026-08-13 走查：CPAP 資料夾
+  // 撞上 fs scope 拒絕點開頭的檔案，拖進去毫無反應）。
+  // 措辭不走 friendlyError：那組分類是為匯入階段寫的（「重新下載檔案」
+  // 對讀取／權限類失敗是錯誤的引導）。
   async function offerFile(path) {
+    try {
+      return await offerFileInner(path);
+    } catch (err) {
+      pending = null;
+      state = "idle";
+      say("");
+      const raw = String(err?.message || err);
+      reportBox.innerHTML = `<p class="warn">無法讀取這個來源，資料庫未寫入任何資料。</p>`
+        + `<details><summary>技術細節</summary><p>${escapeHtml(raw)}</p></details>`;
+      show(reportBox);
+      return { state, error: raw };
+    }
+  }
+
+  async function offerFileInner(path) {
     if (state === "importing") {
       say("匯入進行中，請等本次完成後再加入新檔案。");
       return { state, rejected: "busy" };
