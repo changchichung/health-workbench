@@ -158,3 +158,65 @@ def test_finalize_import_stats(ctx):
     raw = store.con.execute(
         "SELECT import_stats FROM source_documents WHERE id=?", (doc_id,)).fetchone()[0]
     assert json.loads(raw)["inserted"]["encounters"] == 1
+
+
+def _downgrade_to_v3(store):
+    """把庫降回 v3 現場（移除 v4 產物與版本紀錄）。"""
+    cur = store.con.cursor()
+    for t in ["cpap_daily", "cpap_events", "cpap_oximetry"]:
+        cur.execute(f"DROP TABLE {t}")
+    cur.execute("DELETE FROM schema_version")
+    cur.execute("INSERT INTO schema_version(version) VALUES (3)")
+    store.con.commit()
+
+
+def test_migration_v3_to_v4_atomic(tmp_path):
+    """遷移整段單一交易：中斷即回滾，不留半遷移狀態。"""
+    import sqlite3
+    from src.store.db import Store
+    from src.store import db as db_mod
+
+    dbp = str(tmp_path / "m.sqlite")
+    s = Store(dbp)
+    _downgrade_to_v3(s)
+    s.con.execute("INSERT INTO profiles(display_name) VALUES ('甲')")
+    s.con.commit()
+    s.close()
+
+    # 讓第 3 版遷移的第二句失敗
+    orig = db_mod.MIGRATIONS[3]
+    db_mod.MIGRATIONS[3] = [orig[0], "CREATE TABLE 不合法語法 ("]
+    try:
+        with pytest.raises(sqlite3.Error):
+            Store(dbp)
+    finally:
+        db_mod.MIGRATIONS[3] = orig
+
+    con = sqlite3.connect(dbp)
+    names = {r[0] for r in con.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'")}
+    assert not (names & {"cpap_daily", "cpap_events", "cpap_oximetry"}), \
+        "回滾後不得留下任何 CPAP 表"
+    assert con.execute("SELECT MAX(version) FROM schema_version").fetchone()[0] == 3
+    assert con.execute("SELECT COUNT(*) FROM profiles").fetchone()[0] == 1
+    con.close()
+
+    # 復原後正常升級
+    s2 = Store(dbp)
+    assert s2.schema_version() == SCHEMA_VERSION
+    s2.close()
+
+
+def test_migration_empty_version_row(tmp_path):
+    """版本紀錄為空要明確報錯，不得讓 None 比較拋 TypeError。"""
+    import sqlite3
+    from src.store.db import Store
+
+    dbp = str(tmp_path / "e.sqlite")
+    Store(dbp).close()
+    con = sqlite3.connect(dbp)
+    con.execute("DELETE FROM schema_version")
+    con.commit()
+    con.close()
+    with pytest.raises(RuntimeError, match="沒有任何版本紀錄"):
+        Store(dbp)

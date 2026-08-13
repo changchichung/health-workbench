@@ -32,21 +32,37 @@ class Store:
             self.con.commit()
             return
         ver = cur.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
-        while ver < SCHEMA_VERSION:
-            steps = MIGRATIONS.get(ver)
-            if steps is None:
-                raise RuntimeError(
-                    f"資料庫 schema 版本 {ver} 與程式 {SCHEMA_VERSION} 不符，"
-                    f"且無可用遷移路徑；請備份後以 mhb import 重建。")
-            for sql in steps:
-                cur.execute(sql)
-            ver += 1
-            cur.execute("INSERT INTO schema_version(version) VALUES (?)", (ver,))
-            self.con.commit()
-        if ver != SCHEMA_VERSION:
+        # 版本紀錄存在但為空：None 與數字比較在 Python 會拋 TypeError，
+        # 訊息對使用者無意義。明確攔下（health-database spec）。
+        if ver is None:
+            raise RuntimeError(
+                "資料庫的 schema_version 表沒有任何版本紀錄，無法判斷升級路徑；"
+                "請改用備份還原。")
+        if ver > SCHEMA_VERSION:
             raise RuntimeError(
                 f"資料庫 schema 版本 {ver} 高於程式支援的 {SCHEMA_VERSION}，"
                 f"請更新程式後再開啟。")
+        if ver == SCHEMA_VERSION:
+            return
+        # 遷移整段包在單一交易內：版本註記與 DDL 同進同出。逐版 commit 時，
+        # 若第二版執行到一半中斷，資料庫會停在「版本已寫新值但結構只完成
+        # 一部分」的狀態，之後每次開啟都會略過遷移（health-database spec）。
+        try:
+            cur.execute("BEGIN")
+            while ver < SCHEMA_VERSION:
+                steps = MIGRATIONS.get(ver)
+                if steps is None:
+                    raise RuntimeError(
+                        f"資料庫 schema 版本 {ver} 與程式 {SCHEMA_VERSION} 不符，"
+                        f"且無可用遷移路徑；請備份後以 mhb import 重建。")
+                for sql in steps:
+                    cur.execute(sql)
+                ver += 1
+                cur.execute("INSERT INTO schema_version(version) VALUES (?)", (ver,))
+            self.con.commit()
+        except Exception:
+            self.con.rollback()
+            raise
 
     # ---- profile ----
     def get_or_create_profile(self, display_name, masked_id=None):
