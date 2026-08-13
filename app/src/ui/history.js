@@ -13,6 +13,7 @@ export const ADAPTER_LABELS = {
   nhi_json: "健保存摺（JSON）",
   nhi_xml: "健保存摺（XML）",
   apple_health: "Apple 健康",
+  resmed_edf: "ResMed CPAP SD 卡",
 };
 
 export const RESCUE_TABLE_LABELS = {
@@ -20,7 +21,19 @@ export const RESCUE_TABLE_LABELS = {
   reports: "報告", immunizations: "疫苗", body_measurements: "身體數值",
   cancer_screenings: "癌症篩檢", apple_records: "Apple 紀錄",
   apple_workouts: "Apple 體能訓練",
+  cpap_daily: "睡眠每日摘要", cpap_events: "呼吸事件", cpap_oximetry: "睡眠血氧",
 };
+
+// 紀錄頁「全部資料」那行要統計的表，依顯示順序排（標籤共用
+// RESCUE_TABLE_LABELS，不另養一份）。2026-08-13 實機走查發現這份清單原本
+// 漏了六張表（CPAP 三表、apple_workouts、body_measurements、
+// cancer_screenings），畫面上列著 41 個 CPAP 來源檔卻一筆都沒算進去。
+// tests/ui/history_grouping.test.mjs 以 DDL 對帳釘住：schema 新增資料表
+// 而這裡沒跟上就會轉紅。
+export const COUNT_TABLES = ["encounters", "medications", "lab_results",
+  "reports", "immunizations", "cancer_screenings", "apple_records",
+  "apple_workouts", "body_measurements",
+  "cpap_daily", "cpap_events", "cpap_oximetry"];
 
 // 轉義含 " （面板有屬性位置插值需求，且與 profile_manager／import_flow
 // 的 esc 保持一致，杜絕屬性逃逸；tests/ui/esc_consistency.test.mjs 釘住）
@@ -173,11 +186,9 @@ export function createHistory({ getDriver, getDbPath, onRescued, notify }) {
     rescue = null; // 整卡重繪：收合進行中的面板，避免引用失效 doc
     const driver = getDriver();
     const counts = {};
-    for (const [t, label] of [["encounters", "就醫"], ["medications", "用藥"],
-      ["lab_results", "檢驗"], ["reports", "報告"], ["immunizations", "疫苗"],
-      ["apple_records", "Apple 健康"]]) {
+    for (const t of COUNT_TABLES) {
       const [{ c }] = await driver.select(`SELECT count(*) c FROM ${t}`);
-      counts[label] = c;
+      counts[RESCUE_TABLE_LABELS[t] || t] = c;
     }
     const docs = await driver.select(
       "SELECT d.id, d.filename, d.adapter, d.imported_at, d.import_stats,"
