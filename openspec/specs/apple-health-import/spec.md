@@ -11,10 +11,10 @@ TBD - created by archiving change 'mvp-core-dashboard'. Update Purpose after arc
 匯出的主 XML（檔名 MAY 為本地化名稱如「輸出.xml」，MUST 以內容而非
 檔名判型），擷取健康型別（身體組成/血壓/心率/睡眠/血氧）與活動型別
 （步數/距離/能量/步態/飲食等）之 Record 與 Workout 元素。
-百 MB 量級檔案 MUST 於 60 秒內完成匯入。
+**100 MB 以上**的匯出檔 MUST 於 60 秒內完成匯入。
 
 #### Scenario: 大檔匯入
-- **WHEN** 匯入百 MB 量級、數十萬筆 Record 的輸出.xml
+- **WHEN** 匯入 100 MB 以上、數十萬筆 Record 的輸出.xml
 - **THEN** 60 秒內完成，尖峰記憶體不隨檔案大小線性成長
 
 
