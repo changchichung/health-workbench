@@ -341,12 +341,15 @@ export function createHistory({ getDriver, getDbPath, onRescued, notify }) {
       <h4 class="profile-group">成員「${esc(g.profileName)}」</h4>
       <table><thead><tr><th>匯入時間</th><th>格式</th><th>檔案</th><th></th><th></th></tr></thead>
         <tbody>${groupDocsByBatch(g.docs).map(batchRow).join("")}</tbody></table>`).join("");
+    // 整卡重繪會重置 <details> 的展開狀態，先記下來再還原
+    const wasOpen = box.open;
     box.innerHTML = `
-      <h3>資料庫與匯入紀錄</h3>
+      <summary>資料庫與匯入紀錄<span class="dt">（${docs.length} 筆來源檔案）</span></summary>
       <p class="dbline">全部資料：${esc(countText)}</p>
       <p class="dbline dt">資料庫位置：${esc(getDbPath())}</p>
       <div id="rescue-inline" hidden></div>
       ${groupHtml}`;
+    box.open = wasOpen;
     for (const btn of box.querySelectorAll(".rescue-btn")) {
       btn.addEventListener("click", async () => {
         const docIds = btn.dataset.docs

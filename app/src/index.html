@@ -59,9 +59,9 @@
         </div>
         <div id="import-report" hidden></div>
       </section>
-      <section id="import-history"></section>
-      <section id="db-transfer">
-        <h3>換電腦或備份</h3>
+      <details id="import-history"></details>
+      <details id="db-transfer">
+        <summary>換電腦或備份</summary>
         <p class="dt">「匯出資料庫檔」把整個資料庫存成一份檔案（一致性快照），
           可當備份，也可以帶到新電腦。</p>
         <button id="db-export-btn" type="button" class="btn">匯出資料庫檔…</button>
@@ -69,7 +69,7 @@
           App 資料目錄裡的 mhb.sqlite（或舊版命令列工具產生的資料庫檔）之後，
           現在這台的資料會被換掉。換新電腦時才用它。</p>
         <button id="db-import-btn" type="button" class="btn">匯入既有資料庫檔…</button>
-      </section>
+      </details>
     </section>
 
     <section id="tab-viewer" class="tab-panel" hidden>
