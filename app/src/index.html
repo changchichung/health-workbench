@@ -16,7 +16,7 @@
         <button id="manage-profiles-btn" type="button" class="btn">管理成員…</button>
       </div>
       <nav class="tabs" role="tablist">
-        <button id="tab-btn-import" type="button" role="tab">匯入資料</button>
+        <button id="tab-btn-import" type="button" role="tab">資料管理</button>
         <button id="tab-btn-viewer" type="button" role="tab">資料檢視</button>
       </nav>
     </header>
@@ -60,13 +60,23 @@
         <div id="import-report" hidden></div>
       </section>
       <section id="import-history"></section>
+      <section id="db-transfer">
+        <h3>換電腦或備份</h3>
+        <p class="dt">「匯出資料庫檔」把整個資料庫存成一份檔案（一致性快照），
+          可當備份，也可以帶到新電腦。</p>
+        <button id="db-export-btn" type="button" class="btn">匯出資料庫檔…</button>
+        <p class="dt warn">「匯入既有資料庫檔」會<strong>取代目前的資料庫</strong>：選擇舊電腦
+          App 資料目錄裡的 mhb.sqlite（或舊版命令列工具產生的資料庫檔）之後，
+          現在這台的資料會被換掉。換新電腦時才用它。</p>
+        <button id="db-import-btn" type="button" class="btn">匯入既有資料庫檔…</button>
+      </section>
     </section>
 
     <section id="tab-viewer" class="tab-panel" hidden>
       <div class="viewer-head">
         <button id="export-html-btn" type="button" hidden>匯出單檔 HTML…</button>
       </div>
-      <p id="viewer-empty">尚無資料。請先到「匯入資料」分頁匯入健保存摺或 Apple 健康匯出檔。</p>
+      <p id="viewer-empty">尚無資料。請先到「資料管理」分頁匯入健保存摺或 Apple 健康匯出檔。</p>
       <iframe id="viewer-frame" title="健康資料儀表板" hidden></iframe>
     </section>
   </main>

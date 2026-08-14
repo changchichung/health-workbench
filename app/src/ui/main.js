@@ -245,33 +245,56 @@ async function wireUi() {
       app.flow?.resetPanel();
       await setCurrentProfile(app.currentProfileId);
     },
-    // 進階：匯入既有資料庫檔（2026-08-10 決定自工具列降級收進面板；
-    // 用途＝換電腦搬資料、舊 CLI 庫一次性遷移）
-    onImportDbFile: async () => {
-      const p = await dialogOpen({ multiple: false, title: "選擇既有的 mhb.sqlite" });
-      if (!p) return { ok: false, reason: "cancelled" };
-      return importExisting(p);
-    },
-    // 匯出資料庫檔（app-shell spec）：VACUUM INTO 一致性快照，
-    // 經 rusqlite 直寫不受 fs scope 限制；同名檔案預檢拒絕零寫入
-    onExportDbFile: async () => {
-      const t = window.__TAURI__;
-      const save = t.dialog.save || t.dialog.default?.save;
-      const startDir = await dialogStartDir("export");
-      const name = backupFileName(localDateISO());
-      const target = await save({
+  });
+
+  // 換電腦或備份（2026-08-14 走查回饋：自管理成員面板的進階區移到「資料管理」
+  // 分頁最下方）。2026-08-10 當初把「匯入既有資料庫檔」收進面板是因為它會
+  // 取代整個資料庫、不該出現在主要動線上；移出後改以順序與警告文案處理——
+  // 匯出（安全、常用）在前，匯入（破壞性）在後並明說會取代目前資料。
+  document.getElementById("db-export-btn").addEventListener("click", async () => {
+    const t = window.__TAURI__;
+    const save = t.dialog.save || t.dialog.default?.save;
+    const startDir = await dialogStartDir("export");
+    const name = backupFileName(localDateISO());
+    let target;
+    try {
+      target = await save({
         title: "匯出資料庫檔（含全部成員個資，請妥善保管）",
         defaultPath: startDir ? `${startDir}/${name}` : name,
       });
-      if (!target) return { ok: false, reason: "cancelled" };
-      if (await t.fs.exists(target).catch(() => false)) {
-        return { ok: false, reason: "exists", path: target };
-      }
+    } catch (e) {
+      notify(`匯出失敗：${String(e.message || e)}`, 10000);
+      return;
+    }
+    if (!target) return;
+    if (await t.fs.exists(target).catch(() => false)) {
+      notify("目標已有同名檔案，請換一個檔名再匯出（未寫入任何內容）。", 10000);
+      return;
+    }
+    try {
       await exportDbSnapshot(app.driver, target);
-      await rememberDialogDir("export", target);
-      const bytes = await t.fs.stat(target).then(s => s.size).catch(() => null);
-      return { ok: true, path: target, bytes };
-    },
+    } catch (e) {
+      notify(`匯出失敗：${String(e.message || e)}`, 10000);
+      return;
+    }
+    await rememberDialogDir("export", target);
+    const bytes = await t.fs.stat(target).then(s => s.size).catch(() => null);
+    const size = bytes != null ? `（${(bytes / 1024 / 1024).toFixed(1)}MB）` : "";
+    notify(`已匯出資料庫：${target}${size}，含全部成員個資請妥善保管。`, 12000);
+  });
+
+  document.getElementById("db-import-btn").addEventListener("click", async () => {
+    const p = await dialogOpen({ multiple: false, title: "選擇既有的 mhb.sqlite" });
+    if (!p) return;
+    const r = await importExisting(p);
+    if (r?.ok) {
+      app.flow?.resetPanel();
+      await setCurrentProfile(app.currentProfileId);
+      notify(`已匯入資料庫（schema v${r.version}）。`, 10000);
+    } else if (r && r.reason !== "cancelled") {
+      notify(r.reason === "too_new" ? "此資料庫版本較新，請先更新 App。"
+        : "所選檔案不是本工具的資料庫檔。", 10000);
+    }
   });
   app.flow = createImportFlow({
     getDriver: () => app.driver,

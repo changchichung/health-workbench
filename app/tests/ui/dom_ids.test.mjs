@@ -12,7 +12,7 @@ const HTML = readFileSync(new URL("../../src/index.html", import.meta.url), "utf
 const DYNAMIC_IDS = new Set([
   "import-go", "import-cancel", "goto-viewer-btn",
   "import-profile-select", "import-new-member", "import-new-name", "import-new-go",
-  "pm-msg", "pm-new-name", "pm-add-btn", "pm-inline", "pm-close", "pm-import-db",
+  "pm-msg", "pm-new-name", "pm-add-btn", "pm-inline", "pm-close",
   "pm-rename-name", "pm-rename-go", "pm-rename-cancel",
   "pm-del-name", "pm-del-go", "pm-del-cancel",
 ]);
