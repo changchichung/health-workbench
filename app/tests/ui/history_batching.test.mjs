@@ -2,7 +2,7 @@
 // 同一組向量另在 sleep_render.test.mjs 餵給檢視層真渲染，兩邊語意必須一致。
 import test from "node:test";
 import assert from "node:assert/strict";
-import { groupDocsByBatch, buildBatchRescuePreviewModel }
+import { groupDocsByBatch, buildBatchRescuePreviewModel, insertedText }
   from "../../src/ui/history.js";
 import { BATCH_DOCS, EXPECTED_BATCHES } from "../helpers/batch_vector.mjs";
 
@@ -25,16 +25,42 @@ test("批次分組：統計為組內合計，缺統計的批標記出來而不�
     assert.deepEqual(g.inserted, want.inserted, `第 ${i + 1} 批的 inserted 合計`);
     assert.equal(g.dupTotal, want.dupTotal, `第 ${i + 1} 批的重複略過合計`);
     assert.equal(g.missingStats, want.missingStats,
-      `第 ${i + 1} 批的缺統計標記——缺統計必須看得出來，不能顯示成新增 0 筆`);
+      `第 ${i + 1} 批的缺統計標記：缺統計必須看得出來，不能顯示成新增 0 筆`);
+    assert.equal(g.missingCount, want.missingCount ?? 0,
+      `第 ${i + 1} 批缺統計的檔案數`);
   });
 });
 
 test("批次分組：同 adapter 不同匯入時刻不得合併", () => {
   const got = groupDocsByBatch(BATCH_DOCS);
   const resmed = got.filter(g => g.adapter === "resmed_edf");
-  assert.equal(resmed.length, 2,
-    "兩次 CPAP 匯入是兩批：批次 key 若只用 adapter 會錯誤合併");
-  assert.deepEqual(resmed.map(g => g.docs.length), [3, 2]);
+  assert.equal(resmed.length, 3,
+    "三次 CPAP 匯入是三批：批次 key 若只用 adapter 會錯誤合併");
+  assert.deepEqual(resmed.map(g => g.docs.length), [3, 2, 3]);
+});
+
+// 2026-08-14 紅隊複現：一批裡只要有一個檔解析失敗（import_stats 為 NULL），
+// 原本整批就顯示「早期匯入，無統計」，把同批成功檔案的真實筆數全部丟掉。
+test("匯入紀錄那一欄的文字：缺統計時仍顯示其餘列的合計", () => {
+  assert.equal(insertedText({ cpap_daily: 10, cpap_events: 5 }, false),
+    "新增 15 筆", "沒有缺統計時就是單純合計");
+  assert.equal(insertedText({ cpap_daily: 10, cpap_events: 5 }, true, 1),
+    "新增 15 筆（另有 1 個檔案無統計）",
+    "一個檔解析失敗不得讓同批其他檔的筆數消失");
+  assert.equal(insertedText({}, true, 1), "（早期匯入，無統計）",
+    "整批都沒有統計時維持原措辭");
+  assert.equal(insertedText({ apple_records: 400000 }, false),
+    "新增 400,000 筆", "千分位");
+});
+
+test("批次分組：缺統計的列不得抹掉同批其他列的統計", () => {
+  const got = groupDocsByBatch(BATCH_DOCS);
+  const batch = got.find(g => g.importedAt === "2026-08-15 08:00:00");
+  assert.ok(batch, "找不到含缺統計列的批次");
+  assert.deepEqual(batch.inserted, { cpap_daily: 10, cpap_events: 5 },
+    "其餘兩檔的統計 MUST 照常合計");
+  assert.equal(batch.missingStats, true, "仍要標記這批有缺統計的檔");
+  assert.equal(batch.missingCount, 1, "MUST 記錄有幾個檔案缺統計");
 });
 
 test("批次分組：壞掉的 import_stats 不讓整批爆掉", () => {

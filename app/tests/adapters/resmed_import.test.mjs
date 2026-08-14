@@ -196,6 +196,10 @@ test("未使用日整筆跳過並計數，合法的 0 值不被吃掉", async ()
   assert.equal(daily[1].ahi, 0, "AHI 恰為 0 是合法值，不可被當成缺測刪成 NULL");
   assert.equal(daily[1].ai, 0);
   assert.equal(res.report.sections.cpap_daily.note.includes("2 天"), true);
+  assert.match(res.report.sections.cpap_daily.note, /此檔涵蓋期間內/,
+    "措辭 MUST 限定範圍：STR 是累積檔，不加限定會讀成「本次新增這麼多未使用日」");
+  assert.deepEqual(res.report.dedup.skipped_dup, {},
+    "未使用日不得出現在 dedup（那是「內容重複」的欄位）");
   await d.close();
 });
 
@@ -251,14 +255,19 @@ test("批次統計對帳：同批各列相加＝資料庫實際筆數，沒有�
   }
   assert.deepEqual(batches[0].inserted, actual,
     "批次合計必須等於資料庫實際筆數；不符即代表有某一列裝了整批合計");
-  assert.equal(batches[0].dupTotal, 2, "兩個未使用日只能被算一次");
+  // 未使用日不是「重複跳過」：機器那天沒開，本來就沒有資料可重複。
+  // 且 STR.edf 是累積檔，混進 skipped_dup 會讓這個數字隨每次插卡膨脹。
+  assert.equal(batches[0].dupTotal, 0,
+    "未使用日 NEVER 計入 skipped_dup，否則畫面會顯示成「重複略過 N」且逐次增長");
+  const [strRow] = await d.select(
+    "SELECT import_stats FROM source_documents WHERE filename='STR.edf'");
+  assert.deepEqual(JSON.parse(strRow.import_stats).skipped_dup, {},
+    "STR 那列不得帶 cpap_daily_unused");
 
   // 逐檔展開時每一行也要是該檔自己的數字
   const str = docs.find(r => r.filename === "STR.edf");
   assert.deepEqual(JSON.parse(str.import_stats).inserted, { cpap_daily: 2 },
     "STR 那列只記自己插入的每日摘要，NEVER 含事件或血氧");
-  assert.deepEqual(JSON.parse(str.import_stats).skipped_dup,
-    { cpap_daily_unused: 2 }, "未使用日屬於 STR 這個檔");
   const eve = docs.find(r => r.filename.endsWith("203533_EVE.edf"));
   assert.deepEqual(JSON.parse(eve.import_stats).inserted, { cpap_events: 2 });
   await d.close();

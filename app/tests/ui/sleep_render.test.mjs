@@ -331,7 +331,7 @@ test("匯入紀錄批次摺疊：同一組向量在檢視層得到相同分組�
   // 多檔批各自摺疊成一列；單檔批直接顯示檔名（不產生 summary）
   const summaries = findAll(root, (el) => el.localName === "summary")
     .map((el) => el.textContent);
-  assert.deepEqual(summaries, ["3 個檔案", "2 個檔案"],
+  assert.deepEqual(summaries, ["3 個檔案", "2 個檔案", "3 個檔案"],
     `多檔批必須各摺疊為一列，實際：${JSON.stringify(summaries)}`);
   assert.ok(text.includes("輸出.xml"), "單檔批直接顯示檔名");
   assert.ok(text.includes("健康存摺醫療類_1.json"), "單檔批（缺統計）也要列出");
@@ -349,4 +349,9 @@ test("匯入紀錄批次摺疊：同一組向量在檢視層得到相同分組�
   // 批 D 缺統計：必須看得出來，不能顯示成新增 0 筆
   assert.ok(text.includes("（早期匯入，無統計）"),
     "缺統計的批要標示，不得算成 0");
+  // 批 E：組內有一檔缺統計，其餘兩檔的合計 MUST 照常呈現（2026-08-14 紅隊）
+  assert.ok(text.includes("睡眠每日摘要 +10") && text.includes("呼吸事件 +5"),
+    "一個檔缺統計不得抹掉同批其他檔的筆數");
+  assert.ok(text.includes("另有 1 個檔案無統計"),
+    "仍要註明有幾個檔案沒有統計");
 });

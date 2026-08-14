@@ -47,6 +47,15 @@ export const BATCH_DOCS = [
   // 批 D：缺統計（早期匯入，import_stats 為 null）
   { id: 7, filename: "健康存摺醫療類_1.json", adapter: "nhi_json",
     imported_at: "2026-08-11 23:51:00", import_stats: null },
+  // 批 E：多檔批次中有一檔缺統計（解析失敗的檔會建 source_documents 列，
+  // 但因為 continue 發生在 finalizeImport 之前，import_stats 是 NULL）。
+  // 這一批 MUST 仍呈現其餘兩檔的合計，只註明有幾個檔案沒有統計。
+  { id: 8, filename: "STR.edf", adapter: "resmed_edf",
+    imported_at: "2026-08-15 08:00:00", import_stats: stats({ cpap_daily: 10 }) },
+  { id: 9, filename: "DATALOG/20230801_EVE.edf", adapter: "resmed_edf",
+    imported_at: "2026-08-15 08:00:00", import_stats: stats({ cpap_events: 5 }) },
+  { id: 10, filename: "DATALOG/20230801_SAD.edf", adapter: "resmed_edf",
+    imported_at: "2026-08-15 08:00:00", import_stats: null },
 ];
 
 // 期望分組：key 為 `${adapter}|${imported_at}`，順序＝各批首次出現的順序
@@ -62,7 +71,11 @@ export const EXPECTED_BATCHES = [
     inserted: { apple_records: 400000 }, dupTotal: 30, missingStats: false },
   { key: "nhi_json|2026-08-11 23:51:00",
     filenames: ["健康存摺醫療類_1.json"],
-    inserted: {}, dupTotal: 0, missingStats: true },
+    inserted: {}, dupTotal: 0, missingStats: true, missingCount: 1 },
+  { key: "resmed_edf|2026-08-15 08:00:00",
+    filenames: ["STR.edf", "DATALOG/20230801_EVE.edf", "DATALOG/20230801_SAD.edf"],
+    inserted: { cpap_daily: 10, cpap_events: 5 }, dupTotal: 0,
+    missingStats: true, missingCount: 1 },
 ];
 
 // 檢視層真渲染用：meta.sources 只需要這四個欄位

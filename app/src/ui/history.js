@@ -75,7 +75,7 @@ export function groupDocsByBatch(docs) {
     if (!idx.has(key)) {
       idx.set(key, out.length);
       out.push({ adapter: d.adapter, importedAt: d.imported_at, docs: [],
-        inserted: {}, dupTotal: 0, missingStats: false });
+        inserted: {}, dupTotal: 0, missingStats: false, missingCount: 0 });
     }
     const g = out[idx.get(key)];
     g.docs.push(d);
@@ -83,7 +83,7 @@ export function groupDocsByBatch(docs) {
     try {
       st = d.import_stats ? JSON.parse(d.import_stats) : null;
     } catch { st = null; } // 不可解析＝當作沒有統計，不讓整批渲染失敗
-    if (!st) { g.missingStats = true; continue; }
+    if (!st) { g.missingStats = true; g.missingCount += 1; continue; }
     for (const [t, n] of Object.entries(st.inserted || {})) {
       g.inserted[t] = (g.inserted[t] || 0) + n;
     }
@@ -91,6 +91,19 @@ export function groupDocsByBatch(docs) {
       .reduce((a, b) => a + b, 0);
   }
   return out;
+}
+
+// 純函式：批次的統計 → 匯入紀錄那一欄的文字。
+//
+// 缺統計的列不得抹掉同批其他列的數字（2026-08-14 紅隊複現）：一批裡只要有
+// 一個檔解析失敗，它的 import_stats 就是 NULL（registerSource 在 parseHeader
+// 之前，失敗時 continue 跳過 finalizeImport），原本整批因此顯示「早期匯入，
+// 無統計」，把同批成功檔案的真實筆數全部丟掉。
+export function insertedText(inserted, missing, missingCount = 0) {
+  const n = Object.values(inserted).reduce((a, b) => a + b, 0);
+  if (!missing) return `新增 ${n.toLocaleString()} 筆`;
+  if (!n) return "（早期匯入，無統計）";
+  return `新增 ${n.toLocaleString()} 筆（另有 ${missingCount} 個檔案無統計）`;
 }
 
 // 純函式：previewDocRescue 結果 → 面板顯示模型（design D5、決定 #52）。
@@ -310,11 +323,6 @@ export function createHistory({ getDriver, getDbPath, onRescued, notify }) {
         data-mode="reattribute" data-doc="${d.id}">改歸屬…</button>
       <button type="button" class="btn rescue-btn"
         data-mode="delete" data-doc="${d.id}">刪除…</button>`;
-    const insertedText = (inserted, missing) => {
-      if (missing) return "（早期匯入，無統計）";
-      const n = Object.values(inserted).reduce((a, b) => a + b, 0);
-      return `新增 ${n.toLocaleString()} 筆`;
-    };
     // 一批一列：單檔批次直接顯示檔名；多檔批次摺疊成「N 個檔案」，展開後
     // 逐檔仍在（payload 與資料層都保留逐檔追溯，摺疊只做在檢視層）
     const batchRow = (b) => {
@@ -333,7 +341,7 @@ export function createHistory({ getDriver, getDbPath, onRescued, notify }) {
       return `<tr><td class="dt">${esc(b.importedAt)}</td>
         <td>${esc(ADAPTER_LABELS[b.adapter] || b.adapter)}</td>
         <td>${fileCell}</td>
-        <td class="dt">${esc(insertedText(b.inserted, b.missingStats))}</td>
+        <td class="dt">${esc(insertedText(b.inserted, b.missingStats, b.missingCount))}</td>
         <td class="dt">${actions}</td></tr>`;
     };
     const groups = groupDocsByProfile(docs.map(r => ({ ...r })));

@@ -281,13 +281,19 @@
     } catch (e) { return null; }
   }
 
-  // 接受 groupSources 合計後的物件（單檔來源即該檔自身的統計）
+  // 接受 groupSources 合計後的物件（單檔來源即該檔自身的統計）。
+  // 組內有列缺統計時仍呈現其餘列的合計，只在尾端註明幾個檔案沒有統計：
+  // 一個解析失敗的檔不該讓整批的真實筆數消失（2026-08-14）。
   function importSummary(stats) {
-    if (!stats || stats.missing) return "（早期匯入，無統計）";
+    if (!stats) return "（早期匯入，無統計）";
     const parts = Object.entries(stats.inserted || {})
       .filter(([, n]) => n > 0)
       .map(([k, n]) => `${STAT_ZH[k] || k} +${n.toLocaleString()}`);
     if (stats.dupTotal) parts.push(`重複略過 ${stats.dupTotal.toLocaleString()}`);
+    if (stats.missing) {
+      if (!parts.length) return "（早期匯入，無統計）";
+      parts.push(`另有 ${stats.missingCount} 個檔案無統計`);
+    }
     return parts.join("、") || "無新增（內容均已存在）";
   }
 
@@ -311,7 +317,11 @@
       const g = out[idx.get(key)];
       g.files.push(s);
       const st = parseStats(s.import_stats);
-      if (!st) { g.stats.missing = true; continue; }
+      if (!st) {
+        g.stats.missing = true;
+        g.stats.missingCount = (g.stats.missingCount || 0) + 1;
+        continue;
+      }
       g.stats.inserted = g.stats.inserted || {};
       for (const [k, v] of Object.entries(st.inserted)) {
         g.stats.inserted[k] = (g.stats.inserted[k] || 0) + v;

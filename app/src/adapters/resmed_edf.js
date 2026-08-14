@@ -381,7 +381,6 @@ export const resmedEdfAdapter = {
         store.stats.inserted = {};
         store.stats.skipped_dup = {};
         if (rows) store.stats.inserted[tableOf(name)] = rows;
-        if (fileUnused) store.stats.skipped_dup.cpap_daily_unused = fileUnused;
         await store.finalizeImport(reg.docId);
         perFile.push({ file: entry.relPath, status: "parsed", rows });
         processed += rows;
@@ -402,17 +401,23 @@ export const resmedEdfAdapter = {
           source: { files: perFile, rootName } };
       }
 
-      // 整批合計只餵給本次的匯入報告卡（buildIncremental 的 sections 與
-      // dedup），MUST NOT 再寫進任何 source_documents 列，理由見上面逐檔
-      // 寫入處的註解。
+      // 整批合計只餵給本次的匯入報告卡（buildIncremental 的 sections），
+      // MUST NOT 再寫進任何 source_documents 列，理由見上面逐檔寫入處的註解。
+      //
+      // 未使用日 NEVER 進 skipped_dup：那一欄的語意是「內容重複所以冪等
+      // 跳過」，而未使用日是「機器那天沒開，本來就沒有資料」，兩者不同。
+      // 混在一起有兩個後果：畫面把它說成「重複略過 N」；而且 STR.edf 是整卡
+      // 累積檔，每次插卡都會重數一次全部歷史，N 只會越來越大，讀起來像是
+      // 裝置越來越常沒戴（2026-08-14 紅隊複現）。天數改由下面 sections 的
+      // note 表達，並在措辭上明確限定為「此檔涵蓋期間內」。
       store.stats.inserted = counts;
-      store.stats.skipped_dup = skippedUnused
-        ? { cpap_daily_unused: skippedUnused } : {};
+      store.stats.skipped_dup = {};
 
       const report = await buildIncremental(store, {
         sections: {
           cpap_daily: { status: "parsed", records: counts.cpap_daily,
-            note: skippedUnused ? `另有 ${skippedUnused} 天無使用紀錄，未入庫` : "" },
+            note: skippedUnused
+              ? `此檔涵蓋期間內另有 ${skippedUnused} 天無使用紀錄，未入庫` : "" },
           cpap_events: { status: "parsed", records: counts.cpap_events },
           cpap_oximetry: { status: "parsed", records: counts.cpap_oximetry },
         },
