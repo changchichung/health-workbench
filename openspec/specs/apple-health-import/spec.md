@@ -59,7 +59,7 @@ quality_flag=epoch_placeholder_date；SHALL 對超出型別合理範圍的量測
 - **THEN** 該筆入庫且帶 epoch_placeholder_date 旗標，體重趨勢圖不含此點
 
 #### Scenario: 離群體重
-- **WHEN** 匯入 8.6 kg 體重紀錄
+- **WHEN** 匯入一筆低於合理下界（<30 kg）的體重紀錄
 - **THEN** 該筆入庫且帶 out_of_range 旗標，不進趨勢
 
 
