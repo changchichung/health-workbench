@@ -58,11 +58,22 @@ def build_full(store, stale_knowledge=None):
     )
 
 
+# 各資料表的代表性日期欄位。欄位名各表不同、也不是每張有日期的表都值得報告
+# （apple_workouts 與 apple_records 期間重疊），所以無法用 DDL 自動對帳，
+# 新增有日期的資料表時 MUST 手動評估。順序 MUST 與 JS 的 DATE_RANGE_COLUMNS
+# 一致：品質報告在兩端要逐位元組同構。
+DATE_RANGE_COLUMNS = [
+    ("encounters", "date"), ("lab_results", "test_date"),
+    ("immunizations", "date"), ("body_measurements", "check_date"),
+    ("apple_records", "start_ts"),
+    ("cpap_daily", "summary_date"), ("cpap_events", "session_date"),
+    ("cpap_oximetry", "session_date"),
+]
+
+
 def _date_ranges(store):
     out = {}
-    for table, col in [("encounters", "date"), ("lab_results", "test_date"),
-                       ("immunizations", "date"), ("body_measurements", "check_date"),
-                       ("apple_records", "start_ts")]:
+    for table, col in DATE_RANGE_COLUMNS:
         lo, hi = store.con.execute(
             f"SELECT MIN({col}), MAX({col}) FROM {table}"
             f" WHERE quality_flags NOT LIKE '%epoch_placeholder_date%'"

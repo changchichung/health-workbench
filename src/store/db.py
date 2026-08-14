@@ -4,7 +4,8 @@ import sqlite3
 from pathlib import Path
 
 from .fingerprint import canonical_json, record_fp
-from .schema import DDL, FP_TABLES, MIGRATIONS, SCHEMA_VERSION
+from .schema import (DDL, FP_TABLES, MIGRATIONS, QUALITY_FLAG_TABLES,
+                     SCHEMA_VERSION)
 
 
 class SourceRequired(ValueError):
@@ -208,7 +209,7 @@ class Store:
 
     def quality_flag_counts(self):
         out = {}
-        for t in FP_TABLES + ["medications", "apple_records"]:
+        for t in QUALITY_FLAG_TABLES:
             rows = self.con.execute(
                 f"SELECT quality_flags FROM {t} WHERE quality_flags != ''").fetchall()
             for r in rows:

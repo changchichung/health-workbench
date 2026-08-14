@@ -35,11 +35,21 @@ export async function buildIncremental(store, { sourceInfo, sections }) {
   });
 }
 
+// 各資料表的代表性日期欄位。欄位名各表不同、且不是每張表都有值得報告的
+// 日期（例如 apple_workouts 與 apple_records 期間重疊），所以這份對照無法
+// 用 DDL 自動對帳，新增有日期的資料表時 MUST 手動評估要不要進來。
+// 順序 MUST 與 Python 的 _date_ranges 一致（品質報告要逐位元組同構）。
+const DATE_RANGE_COLUMNS = [
+  ["encounters", "date"], ["lab_results", "test_date"],
+  ["immunizations", "date"], ["body_measurements", "check_date"],
+  ["apple_records", "start_ts"],
+  ["cpap_daily", "summary_date"], ["cpap_events", "session_date"],
+  ["cpap_oximetry", "session_date"],
+];
+
 async function dateRanges(store) {
   const out = {};
-  for (const [table, col] of [["encounters", "date"], ["lab_results", "test_date"],
-    ["immunizations", "date"], ["body_measurements", "check_date"],
-    ["apple_records", "start_ts"]]) {
+  for (const [table, col] of DATE_RANGE_COLUMNS) {
     const [row] = await store.driver.select(
       `SELECT MIN(${col}) lo, MAX(${col}) hi FROM ${table}`
       + ` WHERE quality_flags NOT LIKE '%epoch_placeholder_date%'`

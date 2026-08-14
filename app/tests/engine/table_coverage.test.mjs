@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import { DDL } from "../../src/store/schema.js";
 import { DOC_DATA_TABLES } from "../../src/engine/doc_rescue.js";
 import { PROFILE_DATA_TABLES } from "../../src/engine/profiles.js";
+import { QUALITY_FLAG_TABLES } from "../../src/engine/store.js";
 
 // 非「成員資料」的表：profiles 本身、來源紀錄（各清單另行處理）、schema 版本
 const META_TABLES = new Set(["profiles", "schema_version", "source_documents"]);
@@ -40,6 +41,33 @@ test("PROFILE_DATA_TABLES 的 source_documents 必須排在所有引用它的表
   assert.ok(idx >= 0, "成員刪除必須連帶刪除來源紀錄");
   assert.equal(idx, PROFILE_DATA_TABLES.length - 1,
     "cpap_*／encounters 等的 doc_id 指向 source_documents，它必須最後刪");
+});
+
+// 以「欄位」對帳（2026-08-14）：有 quality_flags 欄位卻不在掃描清單的表，
+// 其旗標永遠不會出現在品質報告上，而匯入卡照樣顯示「品質旗標：無」，看起來
+// 像這批資料很乾淨。實測當時漏了 apple_workouts 與 CPAP 三表。
+function ddlTablesWithQualityFlags() {
+  const blocks = [...DDL.matchAll(
+    /CREATE TABLE IF NOT EXISTS (\w+)\(([\s\S]*?)\);/g)];
+  assert.ok(blocks.length >= 15,
+    `DDL 只解析到 ${blocks.length} 個建表語句，解析式可能已失效`);
+  const out = blocks.filter(m => /\bquality_flags\b/.test(m[2])).map(m => m[1]);
+  assert.ok(out.length >= 12,
+    `只解析到 ${out.length} 張帶 quality_flags 的表，解析式可能已失效`);
+  return out;
+}
+
+test("QUALITY_FLAG_TABLES 涵蓋 DDL 中每一張帶 quality_flags 的表", () => {
+  const missing = ddlTablesWithQualityFlags()
+    .filter(t => !QUALITY_FLAG_TABLES.includes(t));
+  assert.deepEqual(missing, [],
+    "漏掉的表其品質旗標不會被統計，報告會顯示成「無」而不是漏報");
+});
+
+test("QUALITY_FLAG_TABLES 不得列出沒有 quality_flags 欄位的表", () => {
+  const withFlags = ddlTablesWithQualityFlags();
+  assert.deepEqual(QUALITY_FLAG_TABLES.filter(t => !withFlags.includes(t)), [],
+    "清單中的表若無該欄位，統計查詢會直接拋錯");
 });
 
 test("兩份清單不得列出 DDL 沒有的表（查詢會直接拋錯）", () => {

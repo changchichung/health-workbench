@@ -259,3 +259,10 @@ FP_TABLES = ["encounters", "lab_results", "reports", "immunizations",
 ALL_TABLES = ["profiles", "source_documents", "medications",
               "apple_records", "apple_workouts",
               "cpap_daily", "cpap_events", "cpap_oximetry"] + FP_TABLES
+
+# 帶 quality_flags 欄位的全部資料表（品質報告逐表掃描）。順序 MUST 與 JS 的
+# QUALITY_FLAG_TABLES 一致：品質報告在兩端要逐位元組同構。漏表的後果是該表
+# 的旗標永遠不出現在報告上，而畫面照樣顯示「品質旗標：無」。
+QUALITY_FLAG_TABLES = FP_TABLES + ["medications", "apple_records",
+                                   "apple_workouts", "cpap_daily",
+                                   "cpap_events", "cpap_oximetry"]

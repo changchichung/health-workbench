@@ -5,6 +5,16 @@ import { canonicalJson, recordFp, pyJsonDumps } from "./fingerprint.js";
 export const FP_TABLES = ["encounters", "lab_results", "reports", "immunizations",
   "body_measurements", "cancer_screenings"];
 
+// 帶 quality_flags 欄位的全部資料表。品質報告逐表掃描這份清單，漏掉的表其
+// 旗標永遠不會出現在報告上，而匯入卡照樣顯示「品質旗標：無」，看起來像
+// 「這批資料很乾淨」（2026-08-14 實測：CPAP 的 multi_session 與
+// apple_workouts 的旗標都漏報）。順序 MUST 與 Python 的
+// QUALITY_FLAG_TABLES 一致（品質報告要逐位元組同構）。
+// tests/engine/table_coverage.test.mjs 以 DDL 的欄位對帳釘住。
+export const QUALITY_FLAG_TABLES = [...FP_TABLES, "medications",
+  "apple_records", "apple_workouts",
+  "cpap_daily", "cpap_events", "cpap_oximetry"];
+
 export class SourceRequired extends Error {}
 
 export class EngineStore {
@@ -110,7 +120,7 @@ export class EngineStore {
 
   async qualityFlagCounts() {
     const out = {};
-    for (const t of [...FP_TABLES, "medications", "apple_records"]) {
+    for (const t of QUALITY_FLAG_TABLES) {
       const rows = await this.driver.select(
         `SELECT quality_flags FROM ${t} WHERE quality_flags != ''`);
       for (const r of rows) {
