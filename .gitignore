@@ -22,3 +22,15 @@ app/src-tauri/target/
 app/src-tauri/gen/
 app/src-tauri/icons/android/
 app/src-tauri/icons/ios/
+
+# 開發過程紀錄不入公開庫（2026-08-14 決定）
+# 這些檔案的存在目的就是記錄實測，而實測來源是家庭成員的真實健康資料。
+# 個資外流不可逆，設計脈絡不公開則隨時可逆（清洗後放回即可），因此選
+# 結構性隔離而非偵測型守衛：偵測擋得住數字，擋不住「所有 session 都在
+# 20:00 至 22:00 開始」這種敘述型的健康資訊。
+# 本地檔案完全保留，且從此可以寫真實數字，不必再為公開而犧牲精確度。
+openspec/changes/
+docs/verification/
+docs/spikes/
+docs/*handoff*.md
+docs/20260808_phase0_findings.md

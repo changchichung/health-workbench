@@ -213,8 +213,10 @@ App 資料目錄一律不進版本控制，測試只用合成樣本）。
 - **CI**：`.github/workflows/app-build.yml`（測試＋守衛 → 雙平台建置）；
   `release.yml`（推 semver tag → 版本一致性關卡 → 全測試 → 雙平台
   建置並發成 release 草稿，零長期密鑰）。
-- **規格**：`openspec/`（Spectra SDD，specs 為單一事實來源）；
-  格式研究 `docs/20260808_phase0_findings.md`；`phase0/` 為已封存的
-  探索原型。
+- **規格**：`openspec/specs/`（Spectra SDD，specs 為單一事實來源）；
+  健保存摺的官方格式文件在 `docs/specs/`；`phase0/` 為已封存的探索原型。
 - **個資紀律**：`data/` 與 App 資料目錄一律不進版本控制；CI 只用
-  合成測試資料；README 截圖亦為合成資料。
+  合成測試資料；README 截圖亦為合成資料。**開發過程紀錄（proposal／
+  design／驗證紀錄／交接文件）不進本倉庫**：它們的存在目的就是記錄
+  實測，而實測來源是真人的健康資料，即使只寫筆數與天數，合起來仍構成
+  可辨識的健康輪廓。

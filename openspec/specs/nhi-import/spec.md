@@ -59,8 +59,8 @@ r9_1（中醫醫囑）為用藥/處置明細，每筆 MUST 關聯所屬就醫事
 匯入完成後明細總數 MUST 與原始檔逐節區加總相等（對帳驗證）。
 
 #### Scenario: 醫囑對帳
-- **WHEN** 原始檔 r1_1+r3_1+r9_1 合計 386 筆
-- **THEN** medications 表新增 386 筆且每筆 encounter_id 有效
+- **WHEN** 原始檔 r1_1+r3_1+r9_1 合計 N 筆用藥
+- **THEN** medications 表恰好新增 N 筆且每筆 encounter_id 有效
 
 
 <!-- @trace
