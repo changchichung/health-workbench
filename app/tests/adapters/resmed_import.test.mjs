@@ -9,6 +9,8 @@ import { resmedEdfAdapter, sessionDateOf, dailyDateOf, parseDeviceModel }
   from "../../src/adapters/resmed_edf.js";
 import { makeEdf, annotationRecord, STR_SIGNALS, SAD_SIGNALS, EVE_SIGNALS }
   from "../helpers/make_edf.mjs";
+// 紀錄頁上線那份分組函式：統計寫得對不對，由它的合計與資料庫對帳來認定
+import { groupDocsByBatch } from "../../src/ui/history.js";
 
 // 記憶體 ByteSource（介面同 tests/helpers/node_source.mjs 的最小子集）
 function memSource(bytes, name) {
@@ -208,6 +210,57 @@ test("多段 session：段數、首末時刻與 extra_json.segments", async () =
   assert.equal(row.session_end_min, 1000, "末段止");
   assert.equal(row.quality_flags, "multi_session");
   assert.deepEqual(JSON.parse(row.extra_json).segments, [[600, 780], [900, 1000]]);
+  await d.close();
+});
+
+// 對帳（2026-08-14 缺陷）：紀錄頁與檢視層把同批各列的 import_stats 相加當作
+// 批次新增筆數，所以「每列只記自己」是不變量。原本 STR 那列裝的是整批合計，
+// 相加後事件數變成兩倍（實測 4 個檔顯示 10 筆／實際 6 筆；真實 41 檔那批會
+// 顯示 831／實際 545），而當時的共用測試向量正好把合計形狀寫成期望值，兩份
+// 實作都照著錯的答案通過。這裡改用真實匯入產生的統計，直接與資料庫對帳。
+test("批次統計對帳：同批各列相加＝資料庫實際筆數，沒有一列裝整批合計", async () => {
+  const { d, pid } = await setup();
+  const entries = [
+    { relPath: "Identification.tgt", source: textSource(IDENT, "i") },
+    // 含兩個未使用日：unused 計數必須落在 STR 自己那列
+    { relPath: "STR.edf",
+      source: memSource(strBytes([day(), UNUSED, UNUSED, day({ ahi: 25 })]), "STR.edf") },
+    { relPath: "DATALOG/20230612_203533_EVE.edf", source: memSource(eveBytes([
+      { onset: 115, duration: 11, label: "Obstructive Apnea" },
+      { onset: 188, duration: 14, label: "Central Apnea" },
+    ]), "e1.edf") },
+    { relPath: "DATALOG/20230612_213533_EVE.edf", source: memSource(eveBytes([
+      { onset: 10, duration: 9, label: "Apnea" },
+    ], { startTime: "21.35.33" }), "e2.edf") },
+    { relPath: "DATALOG/20230612_223536_SAD.edf", source: memSource(sadBytes([
+      [new Array(60).fill(70), new Array(60).fill(96)],
+    ]), "s.edf") },
+  ];
+  await run(d, entries, pid);
+
+  const docs = await d.select(
+    "SELECT id, filename, adapter, imported_at, import_stats"
+    + " FROM source_documents ORDER BY id");
+  const batches = groupDocsByBatch(docs);
+  assert.equal(batches.length, 1, "同一次匯入是一批");
+
+  const actual = {};
+  for (const t of ["cpap_daily", "cpap_events", "cpap_oximetry"]) {
+    const [{ c }] = await d.select(`SELECT count(*) c FROM ${t}`);
+    actual[t] = c;
+  }
+  assert.deepEqual(batches[0].inserted, actual,
+    "批次合計必須等於資料庫實際筆數；不符即代表有某一列裝了整批合計");
+  assert.equal(batches[0].dupTotal, 2, "兩個未使用日只能被算一次");
+
+  // 逐檔展開時每一行也要是該檔自己的數字
+  const str = docs.find(r => r.filename === "STR.edf");
+  assert.deepEqual(JSON.parse(str.import_stats).inserted, { cpap_daily: 2 },
+    "STR 那列只記自己插入的每日摘要，NEVER 含事件或血氧");
+  assert.deepEqual(JSON.parse(str.import_stats).skipped_dup,
+    { cpap_daily_unused: 2 }, "未使用日屬於 STR 這個檔");
+  const eve = docs.find(r => r.filename.endsWith("203533_EVE.edf"));
+  assert.deepEqual(JSON.parse(eve.import_stats).inserted, { cpap_events: 2 });
   await d.close();
 });
 

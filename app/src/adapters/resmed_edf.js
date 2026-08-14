@@ -315,7 +315,6 @@ export const resmedEdfAdapter = {
       let readBytes = 0, processed = 0;
       let skippedUnused = 0, oversize = 0, parseErrors = 0;
       let newFiles = 0, dupFiles = 0;
-      let strDocId = null;
       const counts = { cpap_daily: 0, cpap_events: 0, cpap_oximetry: 0 };
 
       for (const entry of targets) {
@@ -336,11 +335,6 @@ export const resmedEdfAdapter = {
           continue;
         }
         newFiles += 1;
-        // 整批合計只寫在「本次新建」的 STR 列上。若 STR 是重複檔而其他檔是
-        // 新的，覆寫它的 import_stats 會抹掉首次匯入的統計，違反
-        // app-import-engine「匯入不破壞既有資料」的白名單（只允許寫入本次
-        // 新建的 source_documents 列）。
-        if (name === STR_NAME) strDocId = reg.docId;
 
         let header;
         try {
@@ -354,15 +348,17 @@ export const resmedEdfAdapter = {
         }
         const ctx = { pid, docId: reg.docId, device };
         let rows = 0;
+        let fileUnused = 0;
 
         if (name === STR_NAME) {
           const total = actualRecordCount(bytes, header);
           const batch = [];
           for (let r = 0; r < total; r += 1) {
             const row = dailyRow(bytes, header, r, ctx);
-            if (!row) { skippedUnused += 1; continue; }
+            if (!row) { fileUnused += 1; continue; }
             batch.push(row);
           }
+          skippedUnused += fileUnused;
           rows = await d.batchInsert("cpap_daily", DAILY_COLS, batch, { ignore: true });
           counts.cpap_daily += rows;
         } else if (name.endsWith("_EVE.edf")) {
@@ -375,9 +371,16 @@ export const resmedEdfAdapter = {
           counts.cpap_oximetry += rows;
         }
 
-        // 逐檔統計寫在該檔自己的列；整批合計最後寫在 STR 那列（design D2）
+        // 每一列的 import_stats ＝**該檔自己**插入與略過了什麼。任何一列都
+        // NEVER 寫整批合計：紀錄頁與檢視層的批次摺疊會把同批各列相加，其中
+        // 一列若裝的是合計就會雙重計算（2026-08-14 實測：4 個檔的批次顯示
+        // 「新增 10 筆」而資料庫實際 6 筆；真實 41 檔那批會顯示 831／實際
+        // 545）。這裡在重複檔 continue 之後，天然只寫入本次新建的列，符合
+        // app-import-engine「匯入不破壞既有資料」的白名單。
         store.stats.inserted = {};
+        store.stats.skipped_dup = {};
         if (rows) store.stats.inserted[tableOf(name)] = rows;
+        if (fileUnused) store.stats.skipped_dup.cpap_daily_unused = fileUnused;
         await store.finalizeImport(reg.docId);
         perFile.push({ file: entry.relPath, status: "parsed", rows });
         processed += rows;
@@ -398,9 +401,12 @@ export const resmedEdfAdapter = {
           source: { files: perFile, rootName } };
       }
 
+      // 整批合計只餵給本次的匯入報告卡（buildIncremental 的 sections 與
+      // dedup），MUST NOT 再寫進任何 source_documents 列，理由見上面逐檔
+      // 寫入處的註解。
       store.stats.inserted = counts;
-      if (skippedUnused) store.stats.skipped_dup.cpap_daily_unused = skippedUnused;
-      if (strDocId != null) await store.finalizeImport(strDocId);
+      store.stats.skipped_dup = skippedUnused
+        ? { cpap_daily_unused: skippedUnused } : {};
 
       const report = await buildIncremental(store, {
         sections: {

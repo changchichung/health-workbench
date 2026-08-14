@@ -341,9 +341,9 @@ test("匯入紀錄批次摺疊：同一組向量在檢視層得到相同分組�
   assert.ok(text.includes("DATALOG/20230701_EVE.edf"));
 
   // 合計＝組內加總，與 App 端 EXPECTED_BATCHES 的 inserted／dupTotal 對齊：
-  // 批 A 的 cpap_events 是 286+27+14=327，重複略過 214
-  assert.ok(text.includes("呼吸事件 +327"),
-    "第一批的事件合計必須是組內加總（286+27+14）");
+  // 批 A 的 cpap_events 是 272+14=286（STR 列不含事件），重複略過 214
+  assert.ok(text.includes("呼吸事件 +286"),
+    "第一批的事件合計必須是組內加總（272+14）");
   assert.ok(text.includes("重複略過 214"), "重複略過也要合計");
   assert.ok(text.includes("睡眠每日摘要 +259"));
   // 批 D 缺統計：必須看得出來，不能顯示成新增 0 筆
