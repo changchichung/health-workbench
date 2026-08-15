@@ -65,14 +65,16 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         with:
           projectPath: app
-      # 與 release.yml 同一支腳本：每次推 main 就在真實產物上實跑，
-      # 發布當天才第一次執行的腳本等於沒有防線
-      - name: DMG 內附使用說明（僅 macOS）
+      # 與 release.yml 同三支腳本（定位／塞說明檔／驗收）：每次推 main
+      # 就在真實產物上實跑，發布當天才第一次執行的腳本等於沒有防線。
+      # 驗收跑 unsigned 負向對照：斷言未簽章建置「不是」Developer ID
+      # 簽章且無公證票據，同時 dogfood 驗收腳本本身的掛載與比對機制。
+      - name: DMG 內附使用說明＋未簽章驗收（僅 macOS）
         if: matrix.platform == 'macos-latest'
         run: |
-          DMG="$(find app/src-tauri/target -maxdepth 5 -name '*.dmg' -print -quit)"
-          [ -n "$DMG" ] || { echo "::error::找不到 DMG 產物"; exit 1; }
+          DMG="$(bash scripts/locate_dmg.sh)"
           bash scripts/dmg_add_readme.sh "$DMG"
+          bash scripts/verify_macos_signing.sh "$DMG" unsigned
       - name: 上傳安裝包
         uses: actions/upload-artifact@v4
         with:

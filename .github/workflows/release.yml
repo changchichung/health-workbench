@@ -79,30 +79,41 @@ jobs:
       # 簽章 Secrets 尚未設定時要能照常出未簽章產物，不能讓 release 直接失敗
       # （Apple Developer Program 帳號還沒下來的期間仍要能發版）。
       # 判斷式讀 env 而非直接展開 secret 到命令列，避免值出現在指令記錄裡。
+      #
+      # 三態判定：全有＝簽章公證；全無＝未簽章版；**部分設定＝硬失敗**。
+      # 部分設定時 Tauri 只看憑證三件就簽章、公證缺件時靜默降級，會產出
+      # 「簽了章但 Gatekeeper 仍擋」且驗收整步被跳過的產物，比全無更糟。
+      # env 別名與 secrets 同名，迴圈清單即是唯一的六件清單（新增第七個
+      # secret 只需改 names 一處＋補一行同名 env）。
       - name: 判斷 Apple 簽章 Secrets 是否齊全
         id: signing
         shell: bash
         env:
-          CERT: ${{ secrets.APPLE_CERTIFICATE }}
-          CERT_PW: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          A_ID: ${{ secrets.APPLE_ID }}
-          A_PW: ${{ secrets.APPLE_PASSWORD }}
-          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          missing=""
-          [ -n "$CERT" ]     || missing="$missing APPLE_CERTIFICATE"
-          [ -n "$CERT_PW" ]  || missing="$missing APPLE_CERTIFICATE_PASSWORD"
-          [ -n "$IDENTITY" ] || missing="$missing APPLE_SIGNING_IDENTITY"
-          [ -n "$A_ID" ]     || missing="$missing APPLE_ID"
-          [ -n "$A_PW" ]     || missing="$missing APPLE_PASSWORD"
-          [ -n "$TEAM" ]     || missing="$missing APPLE_TEAM_ID"
+          names="APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID"
+          missing=""; present=""
+          for n in $names; do
+            if [ -n "${!n:-}" ]; then
+              present="$present $n"
+            else
+              missing="$missing $n"
+            fi
+          done
           if [ -z "$missing" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
             echo "六個 Secrets 齊全，將簽章並公證"
-          else
+          elif [ -z "$present" ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::缺少$missing，本次產物未簽章未公證，macOS 使用者需手動放行"
+            echo "::warning::簽章 Secrets 全未設定，本次產物未簽章未公證，macOS 使用者需手動放行"
+          else
+            echo "::error::簽章 Secrets 只設定了一部分（缺$missing）。請補齊六個，或全部移除以發未簽章版；半套設定不出貨。"
+            exit 1
           fi
       - name: Tauri 建置並上傳至 release（草稿）
         uses: tauri-apps/tauri-action@v0
@@ -110,6 +121,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # tauri-action 偵測到這些變數才會簽章與公證；未設定時為空字串，
           # Tauri 會照常產出未簽章產物（不會失敗）。
+          # 無條件轉入是安全的：上一步已保證「全有或全無」，部分設定
+          # 在到達這裡之前就被硬失敗擋下。
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -145,62 +158,58 @@ jobs:
             變更明細見 [CHANGELOG](https://github.com/notoriouslab/myhealthbank/blob/main/CHANGELOG.md)。
           releaseDraft: true
           prerelease: false
-      # 簽章與公證的驗收：公證失敗時 DMG 照樣產得出來，只是使用者打不開，
-      # 沒有這道斷言就只能等使用者回報。
-      #
-      # NEVER 只用 spctl 判定：spctl 的結果取決於執行機器的 Gatekeeper 狀態，
-      # 在 `spctl --master-disable` 過的機器上，**完全未簽章**的 App 也會回
-      # accepted／exit 0（2026-08-14 本機實測，輸出為 `override=security
-      # disabled`）。真正的判準是憑證類型與公證票據，兩者都不看 Gatekeeper。
-      - name: 簽章與公證驗收（僅 macOS）
-        if: matrix.platform == 'macos-latest' && steps.signing.outputs.enabled == 'true'
+      # macOS 後處理順序是硬約束：塞說明檔會用 hdiutil 重建映像，DMG 層
+      # 簽章與公證票據存在映像 trailer（不在檔案系統裡），重建即歸零。
+      # 因此必須「先塞檔 → 重新公證＋staple → 驗收 → 上傳」，驗收與上傳
+      # 的才是同一顆完好的最終映像；驗收放在重建之前等於驗一個幾秒後
+      # 就被丟棄的檔案。
+      - name: 定位 DMG 產物（僅 macOS）
+        if: matrix.platform == 'macos-latest'
+        id: bundle
         shell: bash
         run: |
           set -euo pipefail
-          APP="$(find app/src-tauri/target -maxdepth 6 -name 'MyHealthBank.app' -print -quit)"
-          DMG="$(find app/src-tauri/target -maxdepth 5 -name '*.dmg' -print -quit)"
-          [ -n "$APP" ] || { echo "::error::找不到 .app 產物"; exit 1; }
-          [ -n "$DMG" ] || { echo "::error::找不到 DMG 產物"; exit 1; }
-          fail=0
-
-          echo "── 1. 憑證類型必須是 Developer ID Application"
-          # Apple Distribution 憑證也簽得過，但那是 App Store 用的，直接分發
-          # 會被 Gatekeeper 擋；這裡明確斷言憑證種類而不只是「有簽章」。
-          if codesign -dv --verbose=4 "$APP" 2>&1 | grep -q "Authority=Developer ID Application"; then
-            echo "  OK"
-          else
-            echo "::error::未以 Developer ID Application 簽章（adhoc 或憑證類型錯誤）"
-            codesign -dv --verbose=4 "$APP" 2>&1 | head -20
-            fail=1
-          fi
-
-          echo "── 2. 簽章本身必須通過嚴格驗證"
-          codesign --verify --deep --strict --verbose=2 "$APP" || { echo "::error::codesign 驗證失敗"; fail=1; }
-
-          echo "── 3. DMG 必須已 staple 公證票據"
-          # 未公證時 stapler 明確回報 does not have a ticket stapled to it
-          xcrun stapler validate "$DMG" || { echo "::error::DMG 沒有公證票據"; fail=1; }
-
-          echo "── 4. Gatekeeper 評估（僅在該機器啟用評估時才有判定力）"
-          if spctl --status 2>&1 | grep -q "assessments enabled"; then
-            spctl -a -vvv -t install "$DMG" || { echo "::error::Gatekeeper 拒絕此 DMG"; fail=1; }
-          else
-            echo "::warning::此 runner 的 Gatekeeper 評估已停用，spctl 無判定力，略過（前三項仍具約束力）"
-          fi
-
-          [ "$fail" = "0" ] || { echo "::error::簽章／公證驗收未通過，請勿發布此版"; exit 1; }
-          echo "簽章與公證驗收通過"
-      # DMG 內附使用說明：Tauri 的 bundle 設定無法附加任意檔案，改在建置後
-      # 後處理再覆蓋上傳（同一支腳本已在 app-build.yml 每次推 main 時實跑）
-      - name: DMG 內附使用說明並覆蓋上傳（僅 macOS）
+          # 先指派再輸出：echo "dmg=$(...)" 的寫法在腳本失敗時 echo 仍
+          # 成功，會靜默寫入空值讓這步假綠
+          DMG="$(bash scripts/locate_dmg.sh)"
+          echo "dmg=$DMG" >> "$GITHUB_OUTPUT"
+      # Tauri 的 bundle 設定無法附加任意檔案，改在建置後後處理
+      # （同一支腳本已在 app-build.yml 每次推 main 時實跑）
+      - name: DMG 內附使用說明（僅 macOS）
+        if: matrix.platform == 'macos-latest'
+        run: bash scripts/dmg_add_readme.sh "${{ steps.bundle.outputs.dmg }}"
+      # Tauri 只對 .app 公證＋staple，從不 staple DMG；重建後的 DMG 自行
+      # submit＋staple，離線環境的 Gatekeeper 才驗得過。App 內的簽章與
+      # 票據在檔案系統裡，重建不受影響。notarytool 的退件不一定反映在
+      # exit code，最終硬判準是下一步驗收的 stapler validate。
+      - name: DMG 重新公證並 staple（僅 macOS，簽章版）
+        if: matrix.platform == 'macos-latest' && steps.signing.outputs.enabled == 'true'
+        shell: bash
+        env:
+          A_ID: ${{ secrets.APPLE_ID }}
+          A_PW: ${{ secrets.APPLE_PASSWORD }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          DMG="${{ steps.bundle.outputs.dmg }}"
+          xcrun notarytool submit "$DMG" --apple-id "$A_ID" --password "$A_PW" --team-id "$TEAM" --wait
+          xcrun stapler staple "$DMG"
+      # 驗收：公證失敗時 DMG 照樣產得出來，只是使用者打不開，沒有這道
+      # 斷言就只能等使用者回報。簽章版跑 signed 全套斷言；未簽章版跑
+      # unsigned 負向對照（確保驗收機制本身沒退化、產物確實未簽章）。
+      # 斷言細節與「NEVER 接 pipe／NEVER 只信 spctl」的理由都在腳本內。
+      - name: 簽章與公證驗收（僅 macOS）
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.signing.outputs.enabled }}" = "true" ]; then MODE=signed; else MODE=unsigned; fi
+          bash scripts/verify_macos_signing.sh "${{ steps.bundle.outputs.dmg }}" "$MODE"
+      - name: 覆蓋上傳最終 DMG（僅 macOS）
         if: matrix.platform == 'macos-latest'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          DMG="$(find app/src-tauri/target -maxdepth 5 -name '*.dmg' -print -quit)"
-          [ -n "$DMG" ] || { echo "::error::找不到 DMG 產物"; exit 1; }
-          bash scripts/dmg_add_readme.sh "$DMG"
-          gh release upload "v${{ needs.version-gate.outputs.version }}" "$DMG" --clobber
+        run: gh release upload "v${{ needs.version-gate.outputs.version }}" "${{ steps.bundle.outputs.dmg }}" --clobber
       # Windows 安裝檔是單一執行檔，沒有可放說明的容器，改成獨立資產
       # 掛在下載頁（macOS 使用者拿到的是 DMG 內附的那份）
       - name: Windows 使用說明上傳為 release 資產（僅 Windows）
@@ -219,3 +228,22 @@ jobs:
               f.write(src)
           PY
           gh release upload "v${{ needs.version-gate.outputs.version }}" README-Windows.txt --clobber
+      # 草稿 release 與全部資產在驗收之前就由 tauri-action 建好，驗收
+      # 失敗時草稿看起來完整正常（文案還寫著已公證）。這裡把「勿發布」
+      # 寫進草稿本體，人工 publish 前第一眼就看得到，不用去翻 Actions。
+      - name: 建置或驗收失敗時在草稿標記勿發布（雙平台）
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="v${{ needs.version-gate.outputs.version }}"
+          # tauri-action 建 release 之前就失敗的話，沒有草稿可標記
+          gh release view "$TAG" --json body -q .body > body.md || exit 0
+          WARN="> ⚠️ **此草稿的建置或驗收未通過，勿發布。** 詳見本次 Actions 紀錄，修復後重新打 tag。"
+          # 已標記過就不重複插（雙平台 matrix 都可能走到這步）
+          FIRST_LINE="$(head -1 body.md)"
+          case "$FIRST_LINE" in "$WARN"*) exit 0 ;; esac
+          { echo "$WARN"; echo; cat body.md; } > body_new.md
+          gh release edit "$TAG" --notes-file body_new.md

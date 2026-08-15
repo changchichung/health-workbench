@@ -96,8 +96,14 @@ code:
 ### Requirement: 雙平台建置與 CI 零個資
 
 MUST 以 GitHub Actions matrix（macOS、Windows）用官方 tauri-action
-建置雙平台安裝包，產物不簽章。CI MUST 僅使用去識別化 fixtures，
+建置雙平台安裝包。CI MUST 僅使用去識別化 fixtures，
 workflow MUST NOT 讀取 `data/` 目錄。
+
+macOS 簽章為條件式：release 建置在六個 Apple Secrets 齊全時 MUST
+簽章（Developer ID Application）並公證，且 MUST 通過機器驗收
+（憑證類型、codesign 嚴格驗證、App 與 DMG 兩層公證票據）才可發布；
+Secrets 全缺時 MUST 照常產出未簽章產物並於發布說明註明；部分設定
+MUST 使建置失敗（半簽章產物不出貨）。Windows 產物不簽章。
 
 #### Scenario: CI 建置
 - **WHEN** push 觸發建置 workflow
@@ -108,9 +114,23 @@ workflow MUST NOT 讀取 `data/` 目錄。
 - **WHEN** 檢查 workflow 定義與建置日誌
 - **THEN** 無 `data/` 路徑引用；bundle 內容清單不含任何個資檔案
 
+#### Scenario: 簽章驗收擋下不合格產物
+- **WHEN** release 建置的簽章或公證不完整（憑證類型錯誤、票據缺失、
+  或 DMG 後處理後未重新公證）
+- **THEN** 驗收步驟非零退出，最終 DMG 不上傳，release 草稿本體
+  被標記「勿發布」
+
+#### Scenario: 未簽章建置的負向對照
+- **WHEN** 推 main 觸發未簽章建置
+- **THEN** 驗收腳本以 unsigned 模式斷言產物非 Developer ID 簽章
+  且無公證票據（驗收機制每次推 main 都被實跑）
+
 <!-- @trace
 source: tauri-desktop-app
-updated: 2026-08-10
+updated: 2026-08-15
 code:
   - docs/verification/app_qa_closeout.md
+  - .github/workflows/release.yml
+  - .github/workflows/app-build.yml
+  - scripts/verify_macos_signing.sh
 -->
