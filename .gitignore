@@ -14,6 +14,8 @@ phase0/output/
 __pycache__/
 *.pyc
 .claude/worktrees/
+# distill 產物：接班技能含開發過程敘述，照 2026-08-14 結構性隔離決策不入公開庫
+.claude/skills/
 openspec/.vector-search.db*
 
 # Tauri app
