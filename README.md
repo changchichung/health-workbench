@@ -3,6 +3,7 @@
 # HealthWorkbench：個人健康資料工作台
 
 [![Release](https://img.shields.io/github/v/release/notoriouslab/health-workbench?style=flat-square)](https://github.com/notoriouslab/health-workbench/releases)
+[![下載次數](https://img.shields.io/github/downloads/notoriouslab/health-workbench/total?style=flat-square&label=下載次數)](https://github.com/notoriouslab/health-workbench/releases)
 [![License: MIT](https://img.shields.io/github/license/notoriouslab/health-workbench?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/平台-macOS%20%2B%20Windows-0A84FF?style=flat-square)](https://github.com/notoriouslab/health-workbench/releases)
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri)](https://tauri.app/)
