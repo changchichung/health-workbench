@@ -182,6 +182,28 @@ jobs:
       # submit＋staple，離線環境的 Gatekeeper 才驗得過。App 內的簽章與
       # 票據在檔案系統裡，重建不受影響。notarytool 的退件不一定反映在
       # exit code，最終硬判準是下一步驗收的 stapler validate。
+      # 簽章 MUST 在公證之前：codesign 改寫映像內容，先公證會使票據失效。
+      # DMG 層簽章不是公證的必要條件（未簽章的映像，票據僅由內容建出，
+      # stapler validate 照樣通過），但 Apple 建議簽，使用者才能驗證映像
+      # 本身未被惡意修改；且未簽章的 DMG 在 Gatekeeper 評估中會回
+      # 「no usable signature」（2026-08-17 v0.6.0 首次簽章發布連兩輪紅在
+      # 這裡，前三項硬判準全過）。
+      - name: DMG 簽章（僅 macOS，簽章版）
+        if: matrix.platform == 'macos-latest' && steps.signing.outputs.enabled == 'true'
+        shell: bash
+        env:
+          IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          DMG="${{ steps.bundle.outputs.dmg }}"
+          codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+          # 判定命令的輸出先收變數再比對，NEVER 接 pipe（SIGPIPE 假紅）
+          DMG_SIGN="$(codesign -dv --verbose=4 "$DMG" 2>&1 || true)"
+          case "$DMG_SIGN" in
+            *"Authority=Developer ID Application"*) echo "DMG 已簽章" ;;
+            *) echo "::error::DMG 簽章後仍驗不到 Developer ID Application"
+               printf '%s\n' "$DMG_SIGN"; exit 1 ;;
+          esac
       - name: DMG 重新公證並 staple（僅 macOS，簽章版）
         if: matrix.platform == 'macos-latest' && steps.signing.outputs.enabled == 'true'
         shell: bash

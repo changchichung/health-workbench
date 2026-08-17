@@ -59,30 +59,43 @@ if [ "$MODE" = "signed" ]; then
   xcrun stapler validate "$APP" || { echo "::error::App 沒有公證票據"; fail=1; }
   xcrun stapler validate "$DMG" || { echo "::error::DMG 沒有公證票據"; fail=1; }
 
-  echo "── 4. Gatekeeper 評估（僅在該機器啟用評估時才有判定力）"
-  # 評估類型 MUST 是 `open` 且帶 --context context:primary-signature：那是
-  # Apple 對「磁碟映像」的評估方式，正確時回 accepted 與
-  # source=Notarized Developer ID。
-  # NEVER 用 -t install（那是 installer package/.pkg 專用）或預設的 -t exec
-  # （可執行檔專用）：對 DMG 一律回 `rejected / source=no usable signature`，
-  # 與票據是否存在無關，是**必假紅**。2026-08-17 v0.6.0 首次簽章發布實踩：
-  # 前三項硬判準全過（憑證類型、嚴格驗證、App 與 DMG 兩層票據皆 validate
-  # 成功），只有這條紅，整個發布被自己的驗收線擋死。
+  echo "── 4. DMG 本身必須有 Developer ID 簽章"
+  # 票據與簽章是兩件事：公證票據可以只由映像內容建出（未簽章的 DMG 也能
+  # 通過 stapler validate），所以第 3 項過不代表 DMG 有簽章。Apple 建議簽
+  # 映像，使用者才能驗證它未被惡意修改；release workflow 的「DMG 簽章」
+  # step 在公證之前做（codesign 改寫內容，先公證會使票據失效）。
+  # 這條用 codesign 判定而非 spctl：codesign 讀的是產物本身，不受執行機器
+  # 的 Gatekeeper 狀態影響，才是可靠判準。
+  DMG_SIGN="$(codesign -dv --verbose=4 "$DMG" 2>&1 || true)"
+  case "$DMG_SIGN" in
+    *"Authority=Developer ID Application"*) echo "  OK" ;;
+    *)
+      echo "::error::DMG 沒有 Developer ID Application 簽章"
+      printf '%s\n' "$DMG_SIGN"
+      fail=1 ;;
+  esac
+
+  echo "── 5. Gatekeeper 評估（僅供參考，NEVER 作為硬判準）"
+  # spctl 刻意不進 fail：它的結果同時取決於執行機器的 Gatekeeper 狀態與
+  # 評估類型，Apple 官方論壇的說法是「spctl is a poor way to check for
+  # notarization」。真判準是上面四項（憑證類型、嚴格驗證、兩層票據、DMG
+  # 簽章），四者都只讀產物本身。
+  # 傷疤：2026-08-17 v0.6.0 首次簽章發布連兩輪被這條擋死（先是用了 .pkg
+  # 專用的 -t install，改成 DMG 專用的 -t open --context
+  # context:primary-signature 後仍紅，因為當時 DMG 真的沒有簽章）。它指出
+  # 的問題是真的，但把它當硬判準會讓不相關的環境差異也擋下發布。
   SPCTL_STATUS="$(spctl --status 2>&1 || true)"
   case "$SPCTL_STATUS" in
     *"assessments enabled"*)
-      # 判定命令的輸出先收變數再比對，NEVER 接 pipe（SIGPIPE 假紅）；
-      # 失敗時原樣印出，才診斷得了。
       SPCTL_OUT="$(spctl -a -t open --context context:primary-signature -vvv "$DMG" 2>&1 || true)"
       case "$SPCTL_OUT" in
         *accepted*) echo "  OK（${SPCTL_OUT##*source=}）" ;;
         *)
-          echo "::error::Gatekeeper 拒絕此 DMG"
-          printf '%s\n' "$SPCTL_OUT"
-          fail=1 ;;
+          echo "::warning::Gatekeeper 評估未通過（不擋發布，但值得查）"
+          printf '%s\n' "$SPCTL_OUT" ;;
       esac ;;
     *)
-      echo "::warning::此機器的 Gatekeeper 評估已停用，spctl 無判定力，略過（前三項仍具約束力）" ;;
+      echo "::warning::此機器的 Gatekeeper 評估已停用，spctl 無判定力，略過" ;;
   esac
 else
   echo "── 未簽章負向對照：斷言此產物「不是」Developer ID 簽章且無票據"
@@ -98,6 +111,15 @@ else
   else
     echo "  OK（無公證票據，stapler 如預期拒絕）"
   fi
+  # 與 signed 模式第 4 項對稱：未簽章版的 DMG 也不該有 Developer ID 簽章。
+  # 少了這條，DMG 簽章那條斷言就沒有負向對照，無法排除「它恆真」。
+  DMG_SIGN="$(codesign -dv --verbose=4 "$DMG" 2>&1 || true)"
+  case "$DMG_SIGN" in
+    *"Authority=Developer ID Application"*)
+      echo "::error::未簽章建置的 DMG 卻驗出 Developer ID 簽章，建置環境異常"
+      fail=1 ;;
+    *) echo "  OK（DMG 非 Developer ID 簽章）" ;;
+  esac
 fi
 
 [ "$fail" = "0" ] || { echo "::error::簽章／公證驗收未通過，請勿發布此產物"; exit 1; }
