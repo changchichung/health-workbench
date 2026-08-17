@@ -197,34 +197,50 @@ code:
 ---
 ### Requirement: 內容安全政策
 
-`tauri.conf.json` 的 `app.security.csp` MUST 設定，MUST NOT 為 `null`。
+`tauri.conf.json` 的 `app.security.csp` MUST 為 `null`，MUST NOT 設定任何
+CSP 字串。
 
-`connect-src` MUST 限制為 `'self'` 與 Tauri IPC 來源：這是本 App 最關鍵的
-一條，健康資料在任何注入情境下都不得被送出本機。`form-action` MUST 為
-`'none'`、`object-src` MUST 為 `'none'`、`base-uri` MUST 為 `'self'`。
+理由：Tauri 在 `csp` 非 `null` 時會注入 `script-src 'nonce-…'` 以保護自身
+腳本，而 CSP 規範規定 `script-src` 存在 nonce 時 `'unsafe-inline'` 失效。
+檢視層以 `iframe srcdoc` 承載單檔自足的 HTML（inline 一切是它的設計前提，
+見 `dashboard-generator` 的「單檔自足」），srcdoc 繼承父文件的 CSP，於是
+所有 inline script 被擋，四個分頁完全失效。
 
-`script-src` 與 `style-src` MUST 保留 `'unsafe-inline'`：檢視層以
-`iframe srcdoc` 承載單檔自足的 HTML（inline 一切是它的設計前提，見
-`dashboard-generator` 的「單檔自足」），而 srcdoc 繼承父文件的 CSP，禁止
-inline 會使四個分頁完全失效。要移除它必須先讓 assemble 對 srcdoc 注入
-nonce，屬獨立變更，MUST NOT 在未做該項的情況下逕行移除。
+失效的症狀 MUST 記載，因為它不像權限問題：App shell 一切正常（狀態列顯示
+成員與各表筆數），只有 iframe 停在 assemble 的 fallback 文字「載入中…」，
+看起來像資料載入很慢或卡住。判別法是看 renderer 的 CPU：JS 被擋時 CPU 為
+零且記憶體不成長，真的在解析大量資料時 CPU 會滿載。
 
-CSP 變更 MUST 配實機走查，MUST NOT 僅以「前端未載入遠端資源」推論無破壞：
-srcdoc 這個破壞點不會出現在任何靜態掃描裡。走查 MUST 涵蓋四個分頁的內容
-顯示與 iframe 內的互動（全文搜尋、趨勢區間切換）。
+2026-08-17 v0.6.0 實測三種設定：
+1. `default-src 'self'; script-src 'self' 'unsafe-inline'; …` → 壞
+2. 移除 `script-src`，只留 `connect-src`／`object-src`／`base-uri`／
+   `form-action` → **仍壞**（注入的是 Tauri，與我方是否宣告該指令無關）
+3. `csp: null` → 恢復正常
 
-#### Scenario: 檢視層在 CSP 下維持完整功能
-- **WHEN** 設定 CSP 後開啟資料檢視
-- **THEN** 四個分頁正常顯示內容，全文搜尋與趨勢區間切換可用
+**MUST NOT 以 dev 模式走查作為 CSP 變更的驗證**：dev 走 `devUrl`
+（`http://127.0.0.1:*`），不經正式版自訂協議的注入路徑，測不出此差異。
+本輪即因 dev 走查「四分頁與搜尋皆正常」而誤判為安全，正式版才炸。CSP 相關
+變更 MUST 以 `tauri build` 的正式產物驗證。
 
-#### Scenario: 資料不得送出本機
-- **WHEN** 頁面內任何程式碼嘗試對外部網域發出 fetch／XHR／WebSocket
-- **THEN** 該連線被 CSP 阻擋
+要取得 CSP 的防護（尤其 `connect-src` 對外送的限制）必須先改掉 srcdoc
+架構，例如改由自訂協議提供檢視頁、或讓 assemble 接受 nonce 注入，屬獨立
+變更，MUST NOT 在未做該項的情況下逕自設定 csp。
+
+#### Scenario: 檢視層在正式建置下維持完整功能
+- **WHEN** 以 `tauri build` 的產物開啟資料檢視
+- **THEN** 四個分頁正常顯示內容，全文搜尋與趨勢區間切換可用，
+  iframe 不停留在「載入中…」
+
+#### Scenario: 設定 CSP 會使檢視層失效
+- **WHEN** `app.security.csp` 被設為任何非 `null` 值並以正式建置開啟
+- **THEN** iframe 內的 inline script 被 Gatekeeper 以外的 CSP 機制擋下，
+  四個分頁無內容（此為已知限制，不是可調參數）
 
 <!-- @trace
 source: tauri-desktop-app
 updated: 2026-08-17
 code:
   - app/src-tauri/tauri.conf.json
-  - docs/verification/viewer_history_refinement.md
+  - app/src/ui/viewer.js
+  - app/src/provider/assemble.js
 -->
