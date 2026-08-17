@@ -14,10 +14,12 @@ import {
   previewBatchRescue, deleteSourceBatch, reattributeSourceBatch,
   DOC_DATA_TABLES,
 } from "../../src/engine/doc_rescue.js";
+import { seedCpapDoc, cpapCounts } from "../helpers/cpap_seed.mjs";
 
 const ALL_TABLES = ["profiles", "source_documents", "encounters", "medications",
   "lab_results", "reports", "immunizations", "body_measurements",
-  "cancer_screenings", "apple_records", "apple_workouts"];
+  "cancer_screenings", "apple_records", "apple_workouts",
+  "cpap_daily", "cpap_events", "cpap_oximetry"];
 
 async function snapshot(d) {
   const out = {};
@@ -463,31 +465,6 @@ test("reattribute 中斷：整批回滾，全庫與操作前全等", async () =>
 // ---------- CPAP 來源檔的救援（change viewer-and-history-refinement）----------
 // 三個實測到的缺陷：刪除 FK 失敗、改歸屬把資料留在原成員、成員刪除 FK 失敗
 // （後者在 profiles.test.mjs）。CPAP change 新增三張表卻沒接上 doc_rescue。
-
-async function seedCpapDoc(d, pid, { sha = "cpap-1", device = "Dev",
-  date = "2023-06-12", tsSuffix = "20:00:00" } = {}) {
-  const doc = await d.execute(
-    "INSERT INTO source_documents(profile_id,filename,sha256,adapter,adapter_version)"
-    + " VALUES(?,?,?,?,?)", [pid, `${sha}.edf`, sha, "resmed_edf", "1"]);
-  const docId = doc.lastInsertRowid;
-  await d.execute(
-    "INSERT INTO cpap_daily(profile_id,doc_id,device,summary_date,ahi)"
-    + " VALUES(?,?,?,?,?)", [pid, docId, device, date, 2.4]);
-  await d.execute(
-    "INSERT INTO cpap_events(profile_id,doc_id,device,session_date,start_ts,event_type)"
-    + " VALUES(?,?,?,?,?,?)", [pid, docId, device, date, `${date}T${tsSuffix}`, "Apnea"]);
-  await d.execute(
-    "INSERT INTO cpap_oximetry(profile_id,doc_id,device,session_date,minute_ts,"
-    + "spo2_min,sample_count) VALUES(?,?,?,?,?,?,?)",
-    [pid, docId, device, date, `${date}T${tsSuffix}`, 95, 60]);
-  return docId;
-}
-
-const cpapCounts = async (d) => ({
-  daily: (await d.select("SELECT COUNT(*) c FROM cpap_daily"))[0].c,
-  events: (await d.select("SELECT COUNT(*) c FROM cpap_events"))[0].c,
-  oximetry: (await d.select("SELECT COUNT(*) c FROM cpap_oximetry"))[0].c,
-});
 
 test("CPAP 來源檔刪除：三表連帶清除（漏接時 FK 會直接失敗）", async () => {
   const d = await freshDb();

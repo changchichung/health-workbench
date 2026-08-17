@@ -14,10 +14,16 @@ import { appleHealthAdapter } from "../../src/adapters/apple_health.js";
 import { createProfile } from "../../src/engine/profiles.js";
 import { deleteSourceDocument, reattributeSourceDocument }
   from "../../src/engine/doc_rescue.js";
+import { seedCpapDoc } from "../helpers/cpap_seed.mjs";
 
+// 清單漏表不會有任何錯誤訊息：該表從此不在「既有列逐位元組不變」的斷言
+// 宇宙裡，破壞它的改動照樣全綠。且光補清單不夠——baseline 沒有該表的資料
+// 時，快照是空 Map 比空 Map，恆真（2026-08-17 實測：只補 CPAP 三表到清單，
+// 12 條測試零轉紅）。新增資料表 MUST 同時接上這裡與 baseline 的 seed。
 const ALL_TABLES = ["profiles", "source_documents", "encounters", "medications",
   "lab_results", "reports", "immunizations", "body_measurements",
-  "cancer_screenings", "apple_records", "apple_workouts"];
+  "cancer_screenings", "apple_records", "apple_workouts",
+  "cpap_daily", "cpap_events", "cpap_oximetry"];
 
 // ---------- 快照與白名單斷言 ----------
 
@@ -99,7 +105,9 @@ function appleSource(name = "export.xml") {
 
 const IMPORT_OPTS = (pid) => ({ labEntries: [], profileId: pid });
 
-// 兩成員基線庫：A（本人，A12345****）健保＋Apple；B（媽媽，B98765****）健保
+// 兩成員基線庫：A（本人，A12345****）健保＋Apple＋CPAP；B（媽媽，
+// B98765****）健保。A 的 CPAP 使三表在快照中非空——空表比空表恆真，
+// 只把表名加進 ALL_TABLES 而不 seed，等於沒有覆蓋。
 async function baseline() {
   const d = new NodeDriver();
   await initSchema(d);
@@ -111,7 +119,8 @@ async function baseline() {
   await appleHealthAdapter.importSource(appleSource(), d, null, { profileId: a });
   await nhiJsonAdapter.importSource(
     nhiSource("b1.json", "B98765****", [rec("20260103")]), d, null, IMPORT_OPTS(b));
-  return { d, a, b };
+  const cpapDocId = await seedCpapDoc(d, a);
+  return { d, a, b, cpapDocId };
 }
 
 // ---------- 對抗矩陣（D7 七情境） ----------
@@ -286,6 +295,62 @@ test("D7-9 改歸屬中途失敗：交易回滾，全庫與操作前全等", asy
   const [{ masked_id }] = await d.select(
     "SELECT masked_id FROM profiles WHERE id=?", [b]);
   assert.equal(masked_id, "B98765****", "來源綁定不得因失敗操作被解除");
+  await d.close();
+});
+
+// D7-8／D7-9 的操作目標是健保檔，CPAP 三表只被動驗證「未被波及」。以下兩條
+// 讓操作目標本身是 CPAP 來源檔：三表的列會真的被刪／被搬，回滾必須把它們
+// 逐位元組還原。
+//
+// 這兩條守的是**回滾失效**，不是清單漏接——2026-08-17 實測：把 CPAP 三表從
+// DOC_DATA_TABLES 與 KEY_DUP_TABLES 一起拿掉，本檔 14 條零轉紅（doc_rescue
+// .test.mjs 轉紅 6 條）。清單漏接由 table_coverage.test.mjs 與 doc_rescue
+// .test.mjs 守，本檔不重複。
+// 效力證據（同日三步式突變）：拿掉交易包裝 → D7-8/8b/9/9b 四條轉紅；
+// baseline 少 seed 一張 CPAP 表 → 只有 D7-8b/D7-9b 轉紅；改註解文字 → 不轉紅。
+
+test("D7-8b 刪除 CPAP 來源檔中途失敗：三表連同來源紀錄全數回滾", async () => {
+  const { d, cpapDocId } = await baseline();
+  const before = await snapshot(d);
+  // 故障點＝最後的 source_documents DELETE：CPAP 三表已刪＝最大部分狀態
+  const sabotaged = Object.create(d);
+  sabotaged.execute = (sql, params) => {
+    if (/DELETE FROM source_documents/.test(sql)) throw new Error("模擬中途故障");
+    return d.execute(sql, params);
+  };
+  sabotaged.transaction = (fn) =>
+    NodeDriver.prototype.transaction.call(d, () => fn(sabotaged));
+  await assert.rejects(
+    () => deleteSourceDocument(sabotaged, cpapDocId), /模擬中途故障/);
+  assertUnchanged(before, await snapshot(d));
+  for (const t of ["cpap_daily", "cpap_events", "cpap_oximetry"]) {
+    const [{ c }] = await d.select(`SELECT count(*) c FROM ${t}`);
+    assert.equal(c, 1, `${t} 的列必須在回滾後仍在（部分刪除殘留＝資料遺失）`);
+  }
+  await d.close();
+});
+
+test("D7-9b 改歸屬 CPAP 來源檔中途失敗：三表的歸屬全數回滾", async () => {
+  const { d, a, b, cpapDocId } = await baseline();
+  const before = await snapshot(d);
+  // 故障點＝doc 改掛（CPAP 三表已搬完＝最大部分狀態）
+  const sabotaged = Object.create(d);
+  sabotaged.execute = (sql, params) => {
+    if (/UPDATE source_documents SET profile_id/.test(sql)) {
+      throw new Error("模擬中途故障");
+    }
+    return d.execute(sql, params);
+  };
+  sabotaged.transaction = (fn) =>
+    NodeDriver.prototype.transaction.call(d, () => fn(sabotaged));
+  await assert.rejects(
+    () => reattributeSourceDocument(sabotaged, cpapDocId, b), /模擬中途故障/);
+  assertUnchanged(before, await snapshot(d));
+  for (const t of ["cpap_daily", "cpap_events", "cpap_oximetry"]) {
+    const rows = await d.select(`SELECT profile_id FROM ${t}`);
+    assert.deepEqual(rows.map(x => x.profile_id), [a],
+      `${t} 必須回到原成員；留在目標成員＝資料被半途搬走且無錯誤訊息`);
+  }
   await d.close();
 });
 
