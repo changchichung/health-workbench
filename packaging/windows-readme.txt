@@ -61,18 +61,23 @@ HealthWorkbench 個人健康資料工作台（Windows）
      匯出單檔 HTML   這台電腦用，瀏覽器直接開
      匯出 EPUB       電子書格式，傳到手機、平板上看最方便
 
-   Windows 沒有內建的電子書閱讀器，這台電腦上看用 HTML 就好。
-   要帶到 iPhone、iPad 上看的話請用 EPUB：iOS 沒辦法用 Safari
-   或 Chrome 開啟本機 HTML 檔案，「檔案」App 的預覽也不執行
-   網頁程式，只會一直停在「載入中」，而 EPUB 用內建的 Apple
-   Books 就能直接開，字級也能自己調。
+   這台電腦上看用 HTML 最省事（瀏覽器直接開）。要帶到手機、
+   平板上看的話請用 EPUB：iOS 沒辦法用 Safari 或 Chrome 開啟
+   本機 HTML 檔案，「檔案」App 的預覽也不執行網頁程式，只會
+   一直停在「載入中」，而 EPUB 用內建的 Apple Books 就能直接
+   開，字級也能自己調。
 
-   EPUB 請用 Apple Books 開啟。匯出檔裡的摺疊、搜尋與趨勢圖
-   需要閱讀器會執行網頁程式，多數閱讀器不會（Google Play Books
-   實測不執行，只會顯示一行提示）。加進 Books 時要留意：只要
-   那台裝置的 Books iCloud 同步是開著的，這份檔案就會在 iCloud
-   有備份。只想留在裝置上的話，先到「設定 → 你的名字 → iCloud
-   → 顯示全部 → 圖書」關掉，再把檔案加進 Books。
+   EPUB 要挑會執行網頁程式的閱讀器。匯出檔裡的摺疊、搜尋與
+   趨勢圖需要閱讀器支援 EPUB 3 的 scripted content，多數閱讀器
+   不支援（支援 EPUB 3 不等於支援 scripted content）。實測可用：
+   Apple Books（Mac 與 iPhone）、Thorium Reader（Windows 上也
+   能用）、Android 的 Reasily；Google Play Books 實測不執行，
+   只會顯示一行提示。
+
+   把 EPUB 加進 Apple Books 時要留意：只要那台裝置的 Books
+   iCloud 同步是開著的，這份檔案就會在 iCloud 有備份。只想留
+   在裝置上的話，先到「設定 → 你的名字 → iCloud → 顯示全部
+   → 圖書」關掉，再把檔案加進 Books。
 
    兩種格式都含有完整個人醫療資料，請自行妥善保管。
 

@@ -90,8 +90,9 @@ function dashboard(payload, assets) {
 </head>
 <body>
 <div id="app"><p>載入中…若一直停在這行，表示這個閱讀器不會執行網頁程式
-（Google Play Books 實測如此）。請改用 Apple Books 開啟；在電腦上也可以
-改看「匯出單檔 HTML」產生的檔案，內容相同。</p></div>
+（Google Play Books 實測如此）。請改用 Apple Books、Thorium Reader 或
+Android 的 Reasily 開啟；在電腦上也可以改看「匯出單檔 HTML」產生的檔案，
+內容相同。</p></div>
 <script type="application/json" id="hwb-data">${toEmbeddedJson(payload)}</script>
 <script>${cdata(assets.vendor.join("\n"), "vendor")}</script>
 <script>${cdata(assets.appJs, "app.js")}</script>

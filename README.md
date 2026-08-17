@@ -171,7 +171,7 @@ ResMed 記錄卡用的是公開的 EDF 標準，所以 S10、AirSense 這些較�
 | 格式 | 適合 | 怎麼開 |
 |------|------|--------|
 | 單檔 HTML | 電腦（macOS、Windows） | 瀏覽器直接開 |
-| EPUB | 手機、平板 | 用 Apple Books 開啟，字級可調 |
+| EPUB | 手機、平板 | 用 Apple Books 這類會執行網頁程式的閱讀器開啟，字級可調 |
 
 手機、平板建議用 EPUB。iOS 沒辦法用 Safari 或 Chrome 開啟本機 HTML
 檔案，「檔案」App 的預覽又不執行網頁程式，只會一直停在「載入中」；
@@ -179,10 +179,14 @@ ResMed 記錄卡用的是公開的 EDF 標準，所以 S10、AirSense 這些較�
 [HTML & Markdown 檢視器](https://apps.apple.com/tw/app/id6782357972)
 這類 App 開啟也可以。
 
-**EPUB 請用 Apple Books 開**。匯出檔保留了摺疊、搜尋與趨勢圖，這些需要
-閱讀器會執行網頁程式，而多數閱讀器不會：Google Play Books 實測不執行，
-只會顯示一行提示要你換一個閱讀器，其他閱讀器則沒有一一測過。開起來若
-只看到那行提示就是這個原因，改用 Books，或在電腦上開 HTML 即可。
+**EPUB 要挑會執行網頁程式的閱讀器**。匯出檔保留了摺疊、搜尋與趨勢圖，
+這些需要閱讀器支援 EPUB 3 的 scripted content，而多數閱讀器不支援（支援
+EPUB 3 不等於支援 scripted content，這是最容易誤會的一點）。
+
+實測可用：**Apple Books**（macOS 與 iOS 都驗過）、**Thorium Reader**
+（跨平台，Windows 上也能用）、Android 的 **Reasily**。Google Play Books
+實測不執行，只會顯示一行提示。其他閱讀器沒有一一測過，開起來若只看到
+那行提示就是這個原因，換一個閱讀器，或在電腦上開 HTML 即可。
 
 Books 這邊有一點要留意：只要它的 iCloud 同步是開著的（Mac 預設開著），
 這份檔案就會在 iCloud 有備份。只想留在自己機器上的話，先在「系統設定 →

@@ -67,13 +67,16 @@ Apple 公證，可以直接使用，下面可以跳過。
    本機 HTML 檔案，「檔案」App 的預覽也不執行網頁程式，只會
    一直停在「載入中」。
 
-   EPUB 請用 Apple Books 開啟。匯出檔裡的摺疊、搜尋與趨勢圖
-   需要閱讀器會執行網頁程式，多數閱讀器不會（Google Play Books
-   實測不執行，只會顯示一行提示）。用 Books 開啟時要留意：只要
-   Books 的 iCloud 同步是開著的（Mac 預設開著），這份檔案就會在
-   iCloud 有備份。只想留在自己機器上的話，先到「系統設定 →
-   你的名字 → iCloud → 顯示全部 → 圖書」關掉，再把檔案加進
-   Books。
+   EPUB 要挑會執行網頁程式的閱讀器。匯出檔裡的摺疊、搜尋與
+   趨勢圖需要閱讀器支援 EPUB 3 的 scripted content，多數閱讀器
+   不支援（支援 EPUB 3 不等於支援 scripted content）。實測可用：
+   Apple Books（Mac 與 iPhone）、Thorium Reader、Android 的
+   Reasily；Google Play Books 實測不執行，只會顯示一行提示。
+
+   用 Apple Books 開啟時要留意：只要 Books 的 iCloud 同步是開著
+   的（Mac 預設開著），這份檔案就會在 iCloud 有備份。只想留在
+   自己機器上的話，先到「系統設定 → 你的名字 → iCloud → 顯示
+   全部 → 圖書」關掉，再把檔案加進 Books。
 
    兩種格式都含有完整個人醫療資料，請自行妥善保管。
 

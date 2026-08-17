@@ -165,11 +165,13 @@ HTML，上限實務上不會觸發，但兩條路徑的判準 MUST 相同，避�
 Apple Books 用 `dc:title` 命名書櫃項目與其在 iCloud 容器裡的檔名，改動後
 使用者找不到自己的書，而且沒有任何其他地方會轉紅。
 
-**閱讀器限制**：互動依賴閱讀器執行 JS，而多數閱讀器不執行（Google Play
-Books 實測不執行；Apple Books 於 macOS 與 iOS 實測可用）。內容文件 MUST
-帶一段在 JS 未執行時就看得到的說明，指出原因與可用的替代路徑，MUST NOT
-只留一個空白或永遠停在「載入中」的畫面。對外文件 MUST NOT 把 EPUB 描述成
-任何閱讀器都能得到完整互動。
+**閱讀器限制**：互動依賴閱讀器支援 EPUB 3 的 scripted content，而多數
+閱讀器不支援（支援 EPUB 3 不等於支援 scripted content）。實測可用：Apple
+Books（macOS 與 iOS）、Thorium Reader、Android 的 Reasily；Google Play
+Books 實測不執行。內容文件 MUST 帶一段在 JS 未執行時就看得到的說明，指出
+原因與可用的替代路徑，MUST NOT 只留一個空白或永遠停在「載入中」的畫面。
+對外文件 MUST NOT 把 EPUB 描述成任何閱讀器都能得到完整互動，且列為「實測
+可用」的閱讀器 MUST 真的被實測過。
 
 **範圍**：EPUB 只做 App 端。Python `src/dashboard/generate.py` 不提供 EPUB
 輸出，是裁定的範圍而非未完成項（沿用 Python CLI 作為 oracle 與開發者路徑
