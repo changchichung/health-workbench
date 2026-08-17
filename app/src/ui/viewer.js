@@ -7,6 +7,7 @@ import { assemble, loadAssets } from "../provider/assemble.js";
 import { assembleEpub } from "../provider/epub.js";
 import { localDateISO } from "../engine/values.js";
 import { PROFILE_DATA_TABLES } from "../engine/profiles.js";
+import { defaultSavePath } from "./paths.js";
 
 // 「這位成員有沒有可檢視的資料」＝任一資料表有列。沿用 PROFILE_DATA_TABLES
 // （成員刪除用的同一份清單，已被 tests/engine/table_coverage.test.mjs 的 DDL
@@ -143,10 +144,7 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
     const save = t.dialog.save || t.dialog.default?.save;
     const startDir = await (getExportStartDir?.() ?? null);
     const name = exportFileName(lastMemberName, localDateISO(), ext);
-    return save({
-      title,
-      defaultPath: startDir ? `${startDir}/${name}` : name,
-    });
+    return save({ title, defaultPath: defaultSavePath(startDir, name) });
   }
 
   async function exportHtml(destPath = null) {

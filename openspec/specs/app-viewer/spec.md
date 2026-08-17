@@ -155,6 +155,26 @@ Books 的 iCloud 同步會讓它在 iCloud 有備份），使用者確認後才�
 **可重現**：同一份 payload 與資產 MUST 產生相同位元組（時間戳固定，不取
 執行當下時間），否則無法用雜湊確認內容未變。
 
+**沿用單檔 HTML 的既有護欄**：payload 形狀契約（shape.json）、介面文案的
+禁用詞檢查、10MB 體積上限三者一體適用。EPUB 走 deflate 後遠小於同資料的
+HTML，上限實務上不會觸發，但兩條路徑的判準 MUST 相同，避免其中一條在體積
+上無聲失守。
+
+**書櫃識別**：`dc:title` MUST 是「{成員}的個人健康資料（{資料日期}）」，
+`dc:creator` MUST 是「HealthWorkbench：個人健康資料工作台」。這不是裝飾：
+Apple Books 用 `dc:title` 命名書櫃項目與其在 iCloud 容器裡的檔名，改動後
+使用者找不到自己的書，而且沒有任何其他地方會轉紅。
+
+**閱讀器限制**：互動依賴閱讀器執行 JS，而多數閱讀器不執行（Google Play
+Books 實測不執行；Apple Books 於 macOS 與 iOS 實測可用）。內容文件 MUST
+帶一段在 JS 未執行時就看得到的說明，指出原因與可用的替代路徑，MUST NOT
+只留一個空白或永遠停在「載入中」的畫面。對外文件 MUST NOT 把 EPUB 描述成
+任何閱讀器都能得到完整互動。
+
+**範圍**：EPUB 只做 App 端。Python `src/dashboard/generate.py` 不提供 EPUB
+輸出，是裁定的範圍而非未完成項（沿用 Python CLI 作為 oracle 與開發者路徑
+的既有定位）。
+
 #### Scenario: 產物能被第三方解析器開啟
 - **WHEN** 對有資料的成員匯出 EPUB
 - **THEN** 產物通過獨立於本專案 zip 實作的解析器檢查：CRC 全數正確、
@@ -168,6 +188,11 @@ Books 的 iCloud 同步會讓它在 iCloud 有備份），使用者確認後才�
 #### Scenario: 資產含 CDATA 終止序列
 - **WHEN** 檢視程式或樣式含 `]]>`
 - **THEN** 匯出 MUST 拋錯而非產出無法開啟的檔案
+
+#### Scenario: 閱讀器不執行網頁程式
+- **WHEN** 使用者用不執行 JS 的閱讀器開啟匯出的 EPUB
+- **THEN** 看到的是說明文字（原因＋改用哪個閱讀器＋電腦上可改看 HTML），
+  不是空白畫面
 
 #### Scenario: 匯出前的同步提醒
 - **WHEN** 使用者點選匯出 EPUB

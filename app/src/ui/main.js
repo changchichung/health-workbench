@@ -11,6 +11,7 @@ import { loadSettings, saveSettings, resolveCurrentProfile } from "../store/sett
 import { listProfiles } from "../engine/profiles.js";
 import { createImportFlow } from "./import_flow.js";
 import { createViewer } from "./viewer.js";
+import { defaultSavePath } from "./paths.js";
 import { createHistory } from "./history.js";
 import { createProfileManager } from "./profile_manager.js";
 import { localDateISO } from "../engine/values.js";
@@ -260,7 +261,7 @@ async function wireUi() {
     try {
       target = await save({
         title: "匯出資料庫檔（含全部成員個資，請妥善保管）",
-        defaultPath: startDir ? `${startDir}/${name}` : name,
+        defaultPath: defaultSavePath(startDir, name),
       });
     } catch (e) {
       notify(`匯出失敗：${String(e.message || e)}`, 10000);

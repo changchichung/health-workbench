@@ -15,6 +15,8 @@ import { appleHealthAdapter } from "../../src/adapters/apple_health.js";
 import { nodeFileSource } from "../helpers/node_source.mjs";
 import { buildPayload } from "../../src/provider/payload.js";
 import { assembleEpub, epubIdentifier, xmlEscape } from "../../src/provider/epub.js";
+import { assemble } from "../../src/provider/assemble.js";
+import { seedCpapDoc } from "../helpers/cpap_seed.mjs";
 
 const REPO = new URL("../../..", import.meta.url).pathname;
 const LAB_ENTRIES = JSON.parse(
@@ -31,7 +33,9 @@ function readAssets() {
 }
 
 // 真實路徑產 payload（形狀取自真實產出，不手寫假 payload）
-async function realPayload() {
+// withCpap：第三類來源進 payload 後 EPUB 仍須合法（spec 對單檔 HTML 有
+// 同款要求「匯出 MUST 涵蓋 CPAP 區塊」，EPUB 這條先前沒有對應驗證）
+async function realPayload({ withCpap = false } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), "hwb-epub-"));
   const d = new NodeDriver(path.join(dir, "t.sqlite"));
   await initSchema(d);
@@ -43,6 +47,7 @@ async function realPayload() {
   await appleHealthAdapter.importSource(
     await nodeFileSource(`${REPO}/tests/fixtures/apple_sample.xml`), d, null,
     { profileId: pid });
+  if (withCpap) await seedCpapDoc(d, pid);
   const payload = await buildPayload(d, {
     profileId: pid, knowledgeEntries: LAB_ENTRIES, drugCachePath: null,
     today: "2026-08-17",
@@ -154,6 +159,17 @@ test("成員名的 XML 特殊字元被跳脫（OPF 不會變成非法 XML）", a
   assert.ok(r.opf.includes("A&lt;B&gt;&amp;&quot;C&apos;"));
 });
 
+test("JS 未執行時看得到說明（多數閱讀器不執行，這是唯一看得到的內容）", async () => {
+  const bytes = await assembleEpub(await realPayload(), readAssets());
+  const r = inspect(writeEpub(bytes, "fallback.epub"));
+  const m = r.dashboard.match(/<div id="app">([\s\S]*?)<\/div>/);
+  assert.ok(m, "找不到 fallback 區塊");
+  const text = m[1];
+  assert.ok(text.includes("不會執行網頁程式"), "要說明原因");
+  assert.ok(text.includes("Apple Books"), "要指出可用的閱讀器");
+  assert.ok(text.includes("HTML"), "要給電腦上的替代路徑");
+});
+
 test("書櫃上的書名與作者（Books 用 dc:title 命名檔案）", async () => {
   const payload = await realPayload();
   const bytes = await assembleEpub(payload, readAssets());
@@ -162,6 +178,31 @@ test("書櫃上的書名與作者（Books 用 dc:title 命名檔案）", async (
     `dc:title 不符：${r.opf}`);
   assert.ok(r.opf.includes("<dc:creator>HealthWorkbench：個人健康資料工作台</dc:creator>"),
     `dc:creator 不符：${r.opf}`);
+});
+
+test("EPUB 與單檔 HTML 用的是同一份檢視程式與樣式（spec：兩條路徑共用）", async () => {
+  const payload = await realPayload();
+  const assets = readAssets();
+  const html = assemble(payload, assets);
+  const r = inspect(writeEpub(await assembleEpub(payload, assets), "shared.epub"));
+  // 兩份產物都必須原封不動含有同一份資產。有人替 EPUB 另外接一份資產、
+  // 或對其中一條做了字串加工，這裡就會紅。
+  for (const [name, text] of [["app.js", assets.appJs], ["style.css", assets.css]]) {
+    assert.ok(html.includes(text), `單檔 HTML 未原樣含 ${name}`);
+    assert.ok(r.dashboard.includes(text), `EPUB 未原樣含 ${name}`);
+  }
+});
+
+test("含 CPAP 資料的成員：EPUB 仍合法且睡眠呼吸資料真的在裡面", async () => {
+  const payload = await realPayload({ withCpap: true });
+  assert.ok(payload.cpap.daily.length > 0, "前置條件：payload 要真的有 CPAP 資料");
+  const r = inspect(writeEpub(await assembleEpub(payload, readAssets()), "cpap.epub"));
+  assert.equal(r.bad_member, null);
+  for (const [n, ok] of Object.entries(r.xml_ok)) assert.equal(ok, true, `${n}: ${ok}`);
+  const m = r.dashboard.match(/<script type="application\/json" id="hwb-data">([\s\S]*?)<\/script>/);
+  const back = JSON.parse(m[1].replaceAll("\\u003c", "<")
+    .replaceAll("\\u003e", ">").replaceAll("\\u0026", "&"));
+  assert.equal(back.cpap.daily.length, payload.cpap.daily.length);
 });
 
 test("epubIdentifier 穩定且隨成員與日期變動", () => {

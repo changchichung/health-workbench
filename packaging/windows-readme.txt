@@ -67,10 +67,12 @@ HealthWorkbench 個人健康資料工作台（Windows）
    網頁程式，只會一直停在「載入中」，而 EPUB 用內建的 Apple
    Books 就能直接開，字級也能自己調。
 
-   把 EPUB 加進 Apple Books 時要留意：只要那台裝置的 Books
-   iCloud 同步是開著的，這份檔案就會在 iCloud 有備份。只想留
-   在裝置上的話，先到「設定 → 你的名字 → iCloud → 顯示全部
-   → 圖書」關掉，再把檔案加進 Books。
+   EPUB 請用 Apple Books 開啟。匯出檔裡的摺疊、搜尋與趨勢圖
+   需要閱讀器會執行網頁程式，多數閱讀器不會（Google Play Books
+   實測不執行，只會顯示一行提示）。加進 Books 時要留意：只要
+   那台裝置的 Books iCloud 同步是開著的，這份檔案就會在 iCloud
+   有備份。只想留在裝置上的話，先到「設定 → 你的名字 → iCloud
+   → 顯示全部 → 圖書」關掉，再把檔案加進 Books。
 
    兩種格式都含有完整個人醫療資料，請自行妥善保管。
 
