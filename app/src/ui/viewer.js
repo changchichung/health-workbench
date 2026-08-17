@@ -4,6 +4,7 @@
 // tests/ui/export_name.test.mjs 直測）。
 import { buildPayload } from "../provider/payload.js";
 import { assemble, loadAssets } from "../provider/assemble.js";
+import { assembleEpub } from "../provider/epub.js";
 import { localDateISO } from "../engine/values.js";
 import { PROFILE_DATA_TABLES } from "../engine/profiles.js";
 
@@ -18,21 +19,24 @@ import { PROFILE_DATA_TABLES } from "../engine/profiles.js";
 const HAS_DATA_TABLES = PROFILE_DATA_TABLES.filter(t => t !== "source_documents");
 
 // 純函式：匯出檔名。檔名不安全字元（含控制字元）代換為底線。
-export function exportFileName(memberName, dateStr) {
+// ext 讓 HTML 與 EPUB 兩條匯出路徑共用同一套命名規則（含成員名與日期）。
+export function exportFileName(memberName, dateStr, ext = "html") {
   const safe = String(memberName ?? "")
     .replaceAll(/[/\\:*?"<>|\u0000-\u001f]/g, "_").trim() || "成員";
-  return `dashboard_${safe}_${dateStr.replaceAll("-", "")}-private.html`;
+  return `dashboard_${safe}_${dateStr.replaceAll("-", "")}-private.${ext}`;
 }
 
 export function createViewer({ getDriver, getDbPath, getProfileId,
   getExportStartDir, labEntries, onNotify }) {
   let assets = null;
   let lastHtml = null;
+  let lastPayload = null;
   let lastMemberName = null;
 
   const frame = document.getElementById("viewer-frame");
   const emptyEl = document.getElementById("viewer-empty");
   const exportBtn = document.getElementById("export-html-btn");
+  const epubBtn = document.getElementById("export-epub-btn");
   const EMPTY_TEXT = emptyEl.textContent; // 首啟引導原文（載入提示後要還原）
   // 外部連結攔截掛在 frame 的 load 上（初始化一次，非每次 refresh；
   // srcdoc 每次重設都會觸發 load 對新 document 重掛委派，避免累積）
@@ -66,9 +70,11 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
   function showEmpty() {
     frame.hidden = true;
     exportBtn.hidden = true;
+    epubBtn.hidden = true;
     emptyEl.textContent = EMPTY_TEXT;
     emptyEl.hidden = false;
     lastHtml = null;
+    lastPayload = null;
     lastMemberName = null;
     return { rendered: false };
   }
@@ -96,10 +102,12 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
       today: localDateISO(),
     });
     lastHtml = assemble(payload, assets);
+    lastPayload = payload;
     lastMemberName = payload.meta.profile;
     frame.srcdoc = lastHtml;
     frame.hidden = false;
     exportBtn.hidden = false;
+    epubBtn.hidden = false;
     emptyEl.hidden = true;
     return { rendered: true, bytes: lastHtml.length, counts: payload.meta.counts };
   }
@@ -128,25 +136,41 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
     });
   }
 
+  // HTML 與 EPUB 共用的儲存對話框流程（起始目錄記憶上次匯出位置，
+  // 首次退「文件」，見 main.js dialogStartDir）
+  async function askTarget(ext, title) {
+    const t = window.__TAURI__;
+    const save = t.dialog.save || t.dialog.default?.save;
+    const startDir = await (getExportStartDir?.() ?? null);
+    const name = exportFileName(lastMemberName, localDateISO(), ext);
+    return save({
+      title,
+      defaultPath: startDir ? `${startDir}/${name}` : name,
+    });
+  }
+
   async function exportHtml(destPath = null) {
     if (!lastHtml) await refresh();
     if (!lastHtml) return { ok: false, reason: "no_data" };
-    const t = window.__TAURI__;
-    let target = destPath;
-    if (!target) {
-      const save = t.dialog.save || t.dialog.default?.save;
-      // 起始目錄：記憶上次匯出位置，首次退「文件」（main.js dialogStartDir）
-      const startDir = await (getExportStartDir?.() ?? null);
-      const name = exportFileName(lastMemberName, localDateISO());
-      target = await save({
-        title: `匯出單檔 HTML（僅成員「${lastMemberName}」的資料，含個資請妥善保管）`,
-        defaultPath: startDir ? `${startDir}/${name}` : name,
-      });
-      if (!target) return { ok: false, reason: "cancelled" };
-    }
-    await t.fs.writeTextFile(target, lastHtml);
+    const target = destPath || await askTarget("html",
+      `匯出單檔 HTML（僅成員「${lastMemberName}」的資料，含個資請妥善保管）`);
+    if (!target) return { ok: false, reason: "cancelled" };
+    await window.__TAURI__.fs.writeTextFile(target, lastHtml);
     return { ok: true, path: target, bytes: lastHtml.length };
   }
 
-  return { refresh, exportHtml };
+  // EPUB 是 zip 二進位，寫檔走 fs.writeFile（writeTextFile 會把位元組
+  // 當 UTF-8 字串處理而毀掉檔案）。呼叫端負責先取得 iCloud 同步的確認。
+  async function exportEpub(destPath = null) {
+    if (!lastPayload) await refresh();
+    if (!lastPayload) return { ok: false, reason: "no_data" };
+    const target = destPath || await askTarget("epub",
+      `匯出 EPUB（僅成員「${lastMemberName}」的資料，含個資請妥善保管）`);
+    if (!target) return { ok: false, reason: "cancelled" };
+    const bytes = await assembleEpub(lastPayload, assets);
+    await window.__TAURI__.fs.writeFile(target, bytes);
+    return { ok: true, path: target, bytes: bytes.length };
+  }
+
+  return { refresh, exportHtml, exportEpub };
 }

@@ -1479,7 +1479,7 @@ dependencies = [
 
 [[package]]
 name = "health-workbench-app"
-version = "0.7.0"
+version = "0.7.5"
 dependencies = [
  "rusqlite",
  "serde",

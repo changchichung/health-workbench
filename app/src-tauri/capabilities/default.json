@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "主視窗權限：選檔對話框、檔案存取；SQLite 走 app 自有 db_* commands 不經插件。寫入只允許 $APPDATA（設定檔與藥品快取）；匯出 HTML 與資料庫檔寫的是使用者在儲存對話框選的路徑，由 dialog 插件在選檔當下動態授權（tauri-plugin-dialog 的 save 會 allow_file），不需要在這裡開放。讀取類仍是 ** 待收斂（拖放來源路徑任意，收窄要配合實機走查）",
+  "description": "主視窗權限：選檔對話框、檔案存取；SQLite 走 app 自有 db_* commands 不經插件。寫入只允許 $APPDATA（設定檔與藥品快取），文字與二進位各一條（EPUB 是 zip 二進位，走 write-file）；匯出 HTML／EPUB 與資料庫檔寫的是使用者在儲存對話框選的路徑，由 dialog 插件在選檔當下動態授權（tauri-plugin-dialog 的 save 會 allow_file），不需要在這裡開放。讀取類仍是 ** 待收斂（拖放來源路徑任意，收窄要配合實機走查）",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -21,6 +21,13 @@
     },
     {
       "identifier": "fs:allow-write-text-file",
+      "allow": [
+        { "path": "$APPDATA" },
+        { "path": "$APPDATA/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-file",
       "allow": [
         { "path": "$APPDATA" },
         { "path": "$APPDATA/**" }

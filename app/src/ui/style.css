@@ -167,6 +167,13 @@ body.dragover #app { outline: 3px dashed var(--accent); outline-offset: -6px; bo
 .pm-card th, .pm-card td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .pm-add { display: flex; gap: 8px; margin-top: 10px; }
 .pm-foot { margin-top: 12px; text-align: right; }
+.confirm-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: var(--shadow); padding: 16px 18px; max-width: 640px; margin: 12px 0;
+}
+.confirm-card h3 { margin: 0 0 8px; }
+.confirm-card p { margin: 8px 0; line-height: 1.65; }
+.confirm-foot { margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; }
 #pm-inline, #rescue-inline { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
 button.danger {
   font: 600 14px -apple-system, "PingFang TC", sans-serif;

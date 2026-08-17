@@ -320,10 +320,39 @@ async function wireUi() {
     },
   });
   document.getElementById("profile-select").addEventListener("change", async (e) => {
+    // 換人時收起匯出提醒卡：卡片留在畫面上會讓確認鈕看起來仍屬於前一位成員
+    document.getElementById("epub-confirm").hidden = true;
     await setCurrentProfile(Number(e.target.value));
   });
   document.getElementById("manage-profiles-btn").addEventListener("click",
     () => app.manager.open());
+  // EPUB 匯出：先出 in-app 提醒卡（Books 的 iCloud 同步會讓健康資料離開
+  // 本機，與本專案「不上傳」的定位衝突），確認後才進儲存對話框。
+  // 用頁內元素不用原生 confirm（會凍住 WebView 事件，見 profile_manager.js）。
+  const epubCard = document.getElementById("epub-confirm");
+  document.getElementById("export-epub-btn").addEventListener("click", () => {
+    epubCard.hidden = false;
+  });
+  document.getElementById("epub-cancel").addEventListener("click", () => {
+    epubCard.hidden = true;
+  });
+  document.getElementById("epub-go").addEventListener("click", async () => {
+    epubCard.hidden = true;
+    let r;
+    try {
+      r = await app.viewer.exportEpub();
+    } catch (err) {
+      notify(`匯出失敗：${String(err?.message || err)}`, 10000);
+      return;
+    }
+    if (r.ok) {
+      await rememberDialogDir("export", r.path);
+      notify(`已匯出：${r.path}（${(r.bytes / 1024).toFixed(0)}KB，含全部個資請妥善保管）`, 10000);
+    } else if (r.reason === "no_data") {
+      notify("目前成員尚無資料可匯出。");
+    }
+  });
+
   document.getElementById("export-html-btn").addEventListener("click", async () => {
     // 匯出失敗 NEVER 無聲（Karen HIGH-2：磁碟滿/唯讀/超長檔名原本
     // 表現為「按了沒反應」）

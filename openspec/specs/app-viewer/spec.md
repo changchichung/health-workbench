@@ -3,7 +3,7 @@
 ## Purpose
 
 App 內的即時檢視層：DataProvider 契約、四分頁即時檢視、成員切換與依人
-檢視、單檔 HTML 匯出，以及趨勢圖的共用時間域定位、區間選擇、標記降級與
+檢視、匯出（單檔 HTML 與 EPUB），以及趨勢圖的共用時間域定位、區間選擇、標記降級與
 日期健全性。要求 dashboard-generator 的既有互動行為在 App 內全數不退化
 （change tauri-desktop-app，2026-08-10）。
 
@@ -128,6 +128,60 @@ code:
   - docs/verification/multi_profile_qa_closeout.md
   - docs/verification/trend_time_axis_closeout.md
   - docs/verification/cpap_closeout.md
+-->
+
+---
+### Requirement: EPUB 匯出
+
+App MUST 提供 EPUB 3 匯出，與單檔 HTML 匯出並存。兩條路徑 MUST 共用同一份
+payload 與同一份檢視程式，差別僅在外層骨架（HTML5 對 XHTML）。
+
+**產物結構**（違反其一，閱讀器會拒絕開啟或合法地不執行 JS）：
+- `mimetype` MUST 是 zip 的第一個項目且不壓縮
+- 內容文件在 manifest MUST 標 `properties="scripted"`，用到 SVG 時併標 `svg`
+- 內容文件 MUST 是合法 XML
+
+**內嵌資產**：檢視程式與樣式以 CDATA 承載。資產含 `]]>` 序列時 MUST 拒絕
+產出（該序列會提前終止 CDATA，使內容文件變成非法 XML）。
+
+**寫檔路徑**：EPUB 是二進位 zip，MUST 走 `fs.writeFile`；對應的權限
+identifier MUST 在 capabilities 明列（`fs:default` 不含任何寫入權限），
+且允許路徑 MUST NOT 放寬為 `**`，實際匯出位置由儲存對話框動態授權。
+
+**匯出前確認**：匯出 MUST 先顯示頁內提醒（把檔案加進 Apple Books 後，
+Books 的 iCloud 同步會讓它在 iCloud 有備份），使用者確認後才寫檔。
+提醒 MUST 用頁內元素，MUST NOT 用原生 `confirm`（會凍住 WebView 事件）。
+
+**可重現**：同一份 payload 與資產 MUST 產生相同位元組（時間戳固定，不取
+執行當下時間），否則無法用雜湊確認內容未變。
+
+#### Scenario: 產物能被第三方解析器開啟
+- **WHEN** 對有資料的成員匯出 EPUB
+- **THEN** 產物通過獨立於本專案 zip 實作的解析器檢查：CRC 全數正確、
+  mimetype 為第一項且未壓縮、四份 XML 文件皆為合法 XML、內容文件宣告
+  `scripted`
+
+#### Scenario: 壓縮能力不可用時仍為合法產物
+- **WHEN** 執行環境沒有 `CompressionStream`
+- **THEN** 全部項目退回不壓縮，產物仍為合法 EPUB（體積變大但可開啟）
+
+#### Scenario: 資產含 CDATA 終止序列
+- **WHEN** 檢視程式或樣式含 `]]>`
+- **THEN** 匯出 MUST 拋錯而非產出無法開啟的檔案
+
+#### Scenario: 匯出前的同步提醒
+- **WHEN** 使用者點選匯出 EPUB
+- **THEN** 先出現頁內提醒說明 iCloud 備份行為與關閉位置，取消則不產生
+  任何檔案，確認後才進入儲存對話框
+
+<!-- @trace
+source: epub-export
+updated: 2026-08-17
+code:
+  - app/src/provider/epub.js
+  - app/src/provider/zip.js
+  - app/tests/provider/epub.test.mjs
+  - app/src-tauri/capabilities/default.json
 -->
 
 ---

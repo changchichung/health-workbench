@@ -75,6 +75,20 @@
     <section id="tab-viewer" class="tab-panel" hidden>
       <div class="viewer-head">
         <button id="export-html-btn" type="button" hidden>匯出單檔 HTML…</button>
+        <button id="export-epub-btn" type="button" hidden>匯出 EPUB…</button>
+      </div>
+      <div id="epub-confirm" class="confirm-card" hidden>
+        <h3>匯出 EPUB 前的提醒</h3>
+        <p>EPUB 為電子書格式，很多軟體與平台都支援。若用 Apple Books 開啟，
+        要留意只要 Books 的 iCloud 同步是開著的（Mac 預設開著），這份檔案就會
+        在 iCloud 有備份。</p>
+        <p class="dt">關閉位置：Mac 在「系統設定 → 你的名字 → iCloud →
+        顯示全部 → 圖書」；iPhone、iPad 在「設定 → 你的名字 → iCloud →
+        顯示全部 → 圖書」。只想在自己機器上看的話，先關掉再把檔案加進 Books。</p>
+        <div class="confirm-foot">
+          <button id="epub-cancel" type="button" class="btn">取消</button>
+          <button id="epub-go" type="button" class="primary">我了解，繼續匯出</button>
+        </div>
       </div>
       <p id="viewer-empty">尚無資料。請先到「資料管理」分頁匯入健保存摺或 Apple 健康匯出檔。</p>
       <iframe id="viewer-frame" title="健康資料儀表板" hidden></iframe>

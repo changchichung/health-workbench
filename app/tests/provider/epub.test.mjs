@@ -1,0 +1,172 @@
+// EPUB 匯出的結構驗證。判定刻意交給 Python 標準庫（zipfile／xml.etree）而不是
+// 自家的 zip 讀取器：自產自銷的驗證只能證明「我寫的跟我讀的一致」，證不了
+// 別人的解析器打得開，而 Books 用的正是別人的解析器。
+import test from "node:test";
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { readFileSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { NodeDriver } from "../../src/store/node_driver.js";
+import { initSchema } from "../../src/store/schema.js";
+import { createProfile } from "../../src/engine/profiles.js";
+import { nhiJsonAdapter } from "../../src/adapters/nhi_json.js";
+import { appleHealthAdapter } from "../../src/adapters/apple_health.js";
+import { nodeFileSource } from "../helpers/node_source.mjs";
+import { buildPayload } from "../../src/provider/payload.js";
+import { assembleEpub, epubIdentifier, xmlEscape } from "../../src/provider/epub.js";
+
+const REPO = new URL("../../..", import.meta.url).pathname;
+const LAB_ENTRIES = JSON.parse(
+  readFileSync(new URL("../../src/knowledge/labs.json", import.meta.url), "utf-8"));
+
+function readAssets() {
+  const base = new URL("../../src/viewer/assets/", import.meta.url);
+  const get = (p) => readFileSync(new URL(p, base), "utf-8");
+  return {
+    appJs: get("app.js"),
+    css: get("style.css"),
+    vendor: [get("vendor/preact.min.js"), get("vendor/hooks.umd.js"), get("vendor/htm.umd.js")],
+  };
+}
+
+// 真實路徑產 payload（形狀取自真實產出，不手寫假 payload）
+async function realPayload() {
+  const dir = mkdtempSync(path.join(tmpdir(), "hwb-epub-"));
+  const d = new NodeDriver(path.join(dir, "t.sqlite"));
+  await initSchema(d);
+  const pid = await createProfile(d, "測試成員");
+  await nhiJsonAdapter.importSource(
+    { bytes: new Uint8Array(readFileSync(`${REPO}/tests/fixtures/nhi_sample.json`)),
+      name: "nhi_sample.json" },
+    d, null, { labEntries: LAB_ENTRIES, profileId: pid });
+  await appleHealthAdapter.importSource(
+    await nodeFileSource(`${REPO}/tests/fixtures/apple_sample.xml`), d, null,
+    { profileId: pid });
+  const payload = await buildPayload(d, {
+    profileId: pid, knowledgeEntries: LAB_ENTRIES, drugCachePath: null,
+    today: "2026-08-17",
+  });
+  d.close?.();
+  return payload;
+}
+
+// Python 端結構稽核：回傳 JSON 供斷言
+function inspect(epubPath) {
+  const out = execFileSync("python3", ["-c", [
+    "import json, sys, zipfile",
+    "import xml.etree.ElementTree as ET",
+    `z = zipfile.ZipFile(${JSON.stringify(epubPath)})`,
+    "bad = z.testzip()",
+    "infos = z.infolist()",
+    "res = {'bad_member': bad, 'names': [i.filename for i in infos],",
+    " 'first': infos[0].filename, 'first_method': infos[0].compress_type,",
+    " 'mimetype': z.read('mimetype').decode(),",
+    " 'methods': {i.filename: i.compress_type for i in infos}}",
+    "xml_ok = {}",
+    "for n in res['names']:",
+    "    if n.endswith(('.xml', '.opf', '.xhtml')):",
+    "        try:",
+    "            ET.fromstring(z.read(n)); xml_ok[n] = True",
+    "        except Exception as e:",
+    "            xml_ok[n] = str(e)",
+    "res['xml_ok'] = xml_ok",
+    "opf = z.read('OEBPS/content.opf').decode()",
+    "res['opf'] = opf",
+    "res['dashboard'] = z.read('OEBPS/dashboard.xhtml').decode()",
+    "print(json.dumps(res))",
+  ].join("\n")], { cwd: REPO, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024 });
+  return JSON.parse(out);
+}
+
+function writeEpub(bytes, name = "out.epub") {
+  const dir = mkdtempSync(path.join(tmpdir(), "hwb-epub-out-"));
+  const p = path.join(dir, name);
+  writeFileSync(p, bytes);
+  return p;
+}
+
+test("產出的 EPUB 通過 Python zipfile 與 XML 解析（跨實作驗證）", async () => {
+  const bytes = await assembleEpub(await realPayload(), readAssets());
+  const r = inspect(writeEpub(bytes));
+
+  assert.equal(r.bad_member, null, "zip 有損毀成員（CRC 對不上）");
+  // 硬性要求 1：mimetype 第一且不壓縮（0 = ZIP_STORED）
+  assert.equal(r.first, "mimetype");
+  assert.equal(r.first_method, 0);
+  assert.equal(r.mimetype, "application/epub+zip");
+  assert.deepEqual(r.names, ["mimetype", "META-INF/container.xml",
+    "OEBPS/content.opf", "OEBPS/nav.xhtml", "OEBPS/dashboard.xhtml"]);
+  // 硬性要求 3：每個 XML／XHTML 都是合法 XML
+  for (const [n, ok] of Object.entries(r.xml_ok)) assert.equal(ok, true, `${n}: ${ok}`);
+  // 硬性要求 2：內容文件宣告 scripted（沒宣告的話閱讀器可合法地不執行 JS）
+  assert.match(r.opf, /href="dashboard\.xhtml"[^>]*properties="scripted svg"/);
+  // 檢視層與資料都在
+  assert.ok(r.dashboard.includes('id="hwb-data"'));
+  assert.ok(r.dashboard.includes("<![CDATA["));
+});
+
+test("payload 讀得回來且僅含當前成員", async () => {
+  const payload = await realPayload();
+  const bytes = await assembleEpub(payload, readAssets());
+  const r = inspect(writeEpub(bytes));
+  const m = r.dashboard.match(/<script type="application\/json" id="hwb-data">([\s\S]*?)<\/script>/);
+  assert.ok(m, "找不到嵌入資料節點");
+  const back = JSON.parse(m[1].replaceAll("\\u003c", "<")
+    .replaceAll("\\u003e", ">").replaceAll("\\u0026", "&"));
+  assert.equal(back.meta.profile, "測試成員");
+  assert.equal(back.meta.generated_at, "2026-08-17");
+  assert.deepEqual(Object.keys(back).sort(), Object.keys(payload).sort());
+});
+
+test("同輸入產生相同位元組（可重現）", async () => {
+  const payload = await realPayload();
+  const assets = readAssets();
+  const a = await assembleEpub(payload, assets);
+  const b = await assembleEpub(payload, assets);
+  assert.deepEqual(Buffer.from(a), Buffer.from(b));
+});
+
+test("CompressionStream 不可用時退回 store，產物仍合法", async (t) => {
+  const orig = globalThis.CompressionStream;
+  globalThis.CompressionStream = undefined;
+  t.after(() => { globalThis.CompressionStream = orig; });
+  const bytes = await assembleEpub(await realPayload(), readAssets());
+  const r = inspect(writeEpub(bytes, "stored.epub"));
+  assert.equal(r.bad_member, null);
+  assert.ok(Object.values(r.methods).every(m => m === 0), "應全部為 STORED");
+  for (const [n, ok] of Object.entries(r.xml_ok)) assert.equal(ok, true, `${n}: ${ok}`);
+});
+
+test("資產含 ]]> 時拒絕產出（CDATA 提前終止會讓 XML 非法）", async () => {
+  const assets = readAssets();
+  assets.appJs += '\nvar s = "]]>";';
+  const payload = await realPayload();
+  await assert.rejects(() => assembleEpub(payload, assets), /\]\]>/);
+});
+
+test("成員名的 XML 特殊字元被跳脫（OPF 不會變成非法 XML）", async () => {
+  const payload = await realPayload();
+  payload.meta.profile = 'A<B>&"C\'';
+  const bytes = await assembleEpub(payload, readAssets());
+  const r = inspect(writeEpub(bytes, "escaped.epub"));
+  for (const [n, ok] of Object.entries(r.xml_ok)) assert.equal(ok, true, `${n}: ${ok}`);
+  assert.ok(r.opf.includes("A&lt;B&gt;&amp;&quot;C&apos;"));
+});
+
+test("書櫃上的書名與作者（Books 用 dc:title 命名檔案）", async () => {
+  const payload = await realPayload();
+  const bytes = await assembleEpub(payload, readAssets());
+  const r = inspect(writeEpub(bytes, "meta.epub"));
+  assert.ok(r.opf.includes("<dc:title>測試成員的個人健康資料（2026-08-17）</dc:title>"),
+    `dc:title 不符：${r.opf}`);
+  assert.ok(r.opf.includes("<dc:creator>HealthWorkbench：個人健康資料工作台</dc:creator>"),
+    `dc:creator 不符：${r.opf}`);
+});
+
+test("epubIdentifier 穩定且隨成員與日期變動", () => {
+  assert.equal(epubIdentifier("阿明", "2026-08-17"), epubIdentifier("阿明", "2026-08-17"));
+  assert.notEqual(epubIdentifier("阿明", "2026-08-17"), epubIdentifier("阿華", "2026-08-17"));
+  assert.notEqual(epubIdentifier("阿明", "2026-08-17"), epubIdentifier("阿明", "2026-08-18"));
+  assert.equal(xmlEscape("<&>"), "&lt;&amp;&gt;");
+});
