@@ -112,13 +112,12 @@ macOS／Windows 桌面 App · 不需要帳號 · 檢視時不需要網路
 | **macOS** | `.dmg`（Apple Silicon；Intel 版後續提供） | DMG 內附「使用說明（請先閱讀）.txt」 |
 | **Windows** | `.msi` 或 `.exe`（x64） | 一併下載 `README-Windows.txt` |
 
-macOS 版是否已簽章公證依版本而定，每一版的 release 頁「首次開啟」
-段會註明。已簽章公證的版本直接開啟即可；未簽章的版本首次開啟需
-手動放行：
-
-- **macOS**：按住 Control 點 App 圖示 →「開啟」（或系統設定 →
-  隱私權與安全性 → 仍要開啟）；或在終端機執行一次
-  `xattr -cr /Applications/MyHealthBank.app`
+- **macOS**：**v0.6.0 起已用 Developer ID 簽章並經 Apple 公證**，下載後
+  直接開啟即可，不需要任何終端機指令。首次開啟時系統會問一次「確定要
+  打開從網路下載的 App 嗎」，按「打開」就進去了（那是 macOS 對所有下載
+  程式的標準一次性確認，不是錯誤）。
+  v0.5.0 以前的版本未簽章，首次開啟需手動放行：按住 Control 點 App 圖示
+  →「開啟」，或系統設定 → 隱私權與安全性 → 仍要開啟。
 - **Windows**：安裝檔未簽章，SmartScreen 出現時點「其他資訊」→
   「仍要執行」
 
