@@ -9,7 +9,7 @@ import {
   loadSettings, saveSettings, resolveCurrentProfile, nodeIo,
 } from "../../src/store/settings.js";
 
-const tmp = () => mkdtempSync(path.join(tmpdir(), "mhb-settings-"));
+const tmp = () => mkdtempSync(path.join(tmpdir(), "hwb-settings-"));
 
 test("loadSettings：缺檔回傳 {}", async () => {
   assert.deepEqual(await loadSettings(tmp(), nodeIo), {});

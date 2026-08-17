@@ -11,7 +11,7 @@ const REPO = new URL("../../..", import.meta.url).pathname;
 const REAL_CACHE = path.join(REPO, "data/drug_items.sqlite");
 
 async function fixtureCache() {
-  const p = path.join(mkdtempSync(path.join(tmpdir(), "mhb-drug-")), "drug_items.sqlite");
+  const p = path.join(mkdtempSync(path.join(tmpdir(), "hwb-drug-")), "drug_items.sqlite");
   const d = new NodeDriver(p);
   await d.execute(`CREATE TABLE drug_items(
     code TEXT PRIMARY KEY, name_en TEXT, name_zh TEXT, ingredient TEXT,

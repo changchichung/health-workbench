@@ -58,7 +58,7 @@ export function createViewer({ getDriver, getDbPath, getProfileId,
       await t.fs.copyFile(bundled, local);
       return local;
     } catch (err) {
-      console.error("[mhb] 用藥品項檔快取取不到，西藥品項將無法辨識：", err);
+      console.error("[hwb] 用藥品項檔快取取不到，西藥品項將無法辨識：", err);
       return null;
     }
   }

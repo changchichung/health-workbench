@@ -115,7 +115,7 @@ fn db_close(state: State<'_, DbState>, path: String) -> Result<bool, String> {
 /// 開發模式資料庫路徑覆寫（design D5：路徑不可硬編碼）
 #[tauri::command]
 fn env_db_override() -> Option<String> {
-    std::env::var("MHB_DB_PATH").ok()
+    std::env::var("HWB_DB_PATH").ok()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

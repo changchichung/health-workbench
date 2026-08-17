@@ -16,17 +16,17 @@ snapshot() {
 }
 
 echo "== 第一輪匯入 =="
-python3 -m src.mhb_cli --db "$DB" import "$NHI" --no-rebuild --yes >/dev/null
-python3 -m src.mhb_cli --db "$DB" import "$APPLE" --no-rebuild --yes >/dev/null
+python3 -m src.hwb_cli --db "$DB" import "$NHI" --no-rebuild --yes >/dev/null
+python3 -m src.hwb_cli --db "$DB" import "$APPLE" --no-rebuild --yes >/dev/null
 S1=$(snapshot)
 
 echo "== 第二輪匯入（同輸入） =="
-python3 -m src.mhb_cli --db "$DB" import "$NHI" --no-rebuild --yes >/dev/null
-python3 -m src.mhb_cli --db "$DB" import "$APPLE" --no-rebuild --yes >/dev/null
+python3 -m src.hwb_cli --db "$DB" import "$NHI" --no-rebuild --yes >/dev/null
+python3 -m src.hwb_cli --db "$DB" import "$APPLE" --no-rebuild --yes >/dev/null
 S2=$(snapshot)
 
 echo "== 產出 dashboard =="
-python3 -m src.mhb_cli --db "$DB" rebuild >/dev/null
+python3 -m src.hwb_cli --db "$DB" rebuild >/dev/null
 
 if [ "$S1" = "$S2" ]; then
   echo "PASS: 全表筆數與 record_fp 集合雙輪一致 ($S1)"

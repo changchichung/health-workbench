@@ -10,7 +10,7 @@
 ## Requirements
 
 ### Requirement: 單檔自足與體積上限
-`mhb rebuild` SHALL 產出單一 HTML 檔（檔名 dashboard_YYYYMMDD-private.html，
+`hwb rebuild` SHALL 產出單一 HTML 檔（檔名 dashboard_YYYYMMDD-private.html，
 MUST NOT 覆蓋既有檔案），內嵌全部前端代碼（Preact + htm）與資料，
 MUST NOT 於執行期發出任何網路請求（外部連結除外，僅使用者點擊才離開）；
 檔案 MUST <10MB，超標時 MUST 中止並輸出各資料層體積明細。
@@ -28,7 +28,7 @@ MUST NOT 於執行期發出任何網路請求（外部連結除外，僅使用�
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -47,7 +47,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -77,7 +77,7 @@ dashboard SHALL 提供：(1) 總覽 tiles（各類筆數、資料期間、最近
 - **THEN** Apple 連續量測為折線、健保成健單點以獨立標記同圖顯示且圖例區分
 
 #### Scenario: rebuild 產出與 App 一致
-- **WHEN** 以 `mhb rebuild` 產出單檔並以瀏覽器開啟趨勢頁
+- **WHEN** 以 `hwb rebuild` 產出單檔並以瀏覽器開啟趨勢頁
 - **THEN** 時間軸定位、區間選擇與標記降級行為與 App 內完全一致
 
 
@@ -85,7 +85,7 @@ dashboard SHALL 提供：(1) 總覽 tiles（各類筆數、資料期間、最近
 source: trend-time-axis
 updated: 2026-08-12
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
   - docs/verification/trend_time_axis_closeout.md
@@ -106,7 +106,7 @@ dashboard SHALL 提供跨類別即時搜尋（院所、診斷、藥名、檢驗�
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -131,7 +131,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -150,7 +150,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -170,7 +170,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -194,7 +194,7 @@ x 軸，每次處方一根長條、高度對應給藥日數）、成分與仿單
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -214,7 +214,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -232,7 +232,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->

@@ -1,4 +1,4 @@
-"""mhb — 個人健康資料工作台 CLI。
+"""hwb — 個人健康資料工作台 CLI。
 
 子命令：
   import   匯入健保存摺 JSON 或 Apple Health 匯出（自動判型），並重建 dashboard
@@ -11,7 +11,7 @@ import json
 import sys
 from pathlib import Path
 
-DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "mhb.sqlite"
+DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "hwb.sqlite"
 
 
 def cmd_status(args):
@@ -67,7 +67,7 @@ def cmd_rebuild(args):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="mhb", description="個人健康資料工作台：匯入、累積、檢視自己的健康資料")
+        prog="hwb", description="個人健康資料工作台：匯入、累積、檢視自己的健康資料")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB, help="SQLite 資料庫路徑")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -101,7 +101,7 @@ def main(argv=None):
         return args.func(args)
     except sqlite3.DatabaseError as e:
         print(f"資料庫無法開啟（{args.db}）：{e}\n"
-              f"若檔案損壞：原始下載檔都在，可將其移走後以 mhb import 重建；"
+              f"若檔案損壞：原始下載檔都在，可將其移走後以 hwb import 重建；"
               f"或還原你的備份副本。", file=sys.stderr)
         return 4
 

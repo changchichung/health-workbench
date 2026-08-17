@@ -31,8 +31,8 @@ esac
 MNT="$(mktemp -d)"
 trap 'hdiutil detach "$MNT" >/dev/null 2>&1 || true; rmdir "$MNT" 2>/dev/null || true' EXIT
 hdiutil attach "$DMG" -nobrowse -noautoopen -readonly -mountpoint "$MNT" >/dev/null
-APP="$MNT/MyHealthBank.app"
-[ -d "$APP" ] || { echo "DMG 內找不到 MyHealthBank.app" >&2; exit 1; }
+APP="$MNT/HealthWorkbench.app"
+[ -d "$APP" ] || { echo "DMG 內找不到 HealthWorkbench.app" >&2; exit 1; }
 
 fail=0
 SIGN_INFO="$(codesign -dv --verbose=4 "$APP" 2>&1 || true)"

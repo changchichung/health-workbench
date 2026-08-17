@@ -1,20 +1,20 @@
 <div align="center">
 
-# MyHealthBank：個人健康資料工作台
+# HealthWorkbench：個人健康資料工作台
 
-[![Release](https://img.shields.io/github/v/release/notoriouslab/myhealthbank?style=flat-square)](https://github.com/notoriouslab/myhealthbank/releases)
-[![License: MIT](https://img.shields.io/github/license/notoriouslab/myhealthbank?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/平台-macOS%20%2B%20Windows-0A84FF?style=flat-square)](https://github.com/notoriouslab/myhealthbank/releases)
+[![Release](https://img.shields.io/github/v/release/notoriouslab/health-workbench?style=flat-square)](https://github.com/notoriouslab/health-workbench/releases)
+[![License: MIT](https://img.shields.io/github/license/notoriouslab/health-workbench?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/平台-macOS%20%2B%20Windows-0A84FF?style=flat-square)](https://github.com/notoriouslab/health-workbench/releases)
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri)](https://tauri.app/)
 [![Local-first](https://img.shields.io/badge/本機優先-不上雲-34C759?style=flat-square)]()
-[![Last Commit](https://img.shields.io/github/last-commit/notoriouslab/myhealthbank?style=flat-square)](https://github.com/notoriouslab/myhealthbank/commits)
+[![Last Commit](https://img.shields.io/github/last-commit/notoriouslab/health-workbench?style=flat-square)](https://github.com/notoriouslab/health-workbench/commits)
 
 **把健保「健康存摺」、Apple 健康與 CPAP 呼吸器的下載檔，變成一份越養越深、
 可搜尋、可帶去回診討論的家庭健康紀錄。全程本機，資料不離開你的電腦。**
 
 macOS／Windows 桌面 App · 不需要帳號 · 檢視時不需要網路
 
-### [⬇️ 前往下載](https://github.com/notoriouslab/myhealthbank/releases/latest)
+### [⬇️ 前往下載](https://github.com/notoriouslab/health-workbench/releases/latest)
 
 （macOS 選 `.dmg`；Windows 選 `.msi` 或 `.exe`。安裝與首次開啟說明見下方
 [安裝](#安裝)）
@@ -34,7 +34,7 @@ macOS／Windows 桌面 App · 不需要帳號 · 檢視時不需要網路
 ## 這是什麼？
 
 健保署的「健康存摺」只查得到最近三年的就醫與用藥紀錄，Apple 健康的
-匯出檔又大又難讀，CPAP 呼吸器的資料則鎖在一張 SD 卡裡。MyHealthBank
+匯出檔又大又難讀，CPAP 呼吸器的資料則鎖在一張 SD 卡裡。HealthWorkbench
 把這些來源整理進同一個本機資料庫：每隔一陣子把新下載的檔案拖進來，
 三年的滾動視窗就被接成不斷加深的個人縱深，重複的部分自動跳過，
 不會越匯越亂。
@@ -105,7 +105,7 @@ macOS／Windows 桌面 App · 不需要帳號 · 檢視時不需要網路
 
 ## 安裝
 
-到 [Releases](https://github.com/notoriouslab/myhealthbank/releases) 下載對應平台的安裝包：
+到 [Releases](https://github.com/notoriouslab/health-workbench/releases) 下載對應平台的安裝包：
 
 | 平台 | 下載 | 開啟說明 |
 |------|------|---------|
@@ -150,7 +150,7 @@ ResMed 記錄卡用的是公開的 EDF 標準，所以 S10、AirSense 這些較�
 目前不支援。
 
 如果你的機型匯不進來、或匯進來以後數字看起來不對，歡迎
-[開一個 Issue](https://github.com/notoriouslab/myhealthbank/issues)
+[開一個 Issue](https://github.com/notoriouslab/health-workbench/issues)
 或直接送 PR。
 
 回報時請特別注意：**記錄卡裡是你的健康資料，不要把整份檔案或
@@ -184,8 +184,8 @@ Safari 或 Chrome 直接開啟本機 HTML 檔案，而「檔案」App 的預覽�
 ## 隱私設計
 
 - 資料只存在你電腦的系統應用程式資料目錄（macOS：
-  `~/Library/Application Support/com.notoriouslab.myhealthbank/`；
-  Windows：`%APPDATA%\com.notoriouslab.myhealthbank\`），
+  `~/Library/Application Support/com.notoriouslab.healthworkbench/`；
+  Windows：`%APPDATA%\com.notoriouslab.healthworkbench\`），
   不上傳、不註冊、不追蹤。
 - 檢視過程零網路請求；只有點擊藥品仿單這類外部連結時才會開瀏覽器。
 - 匯出的儀表板檔名帶 `-private` 字樣、頁首有紅字提醒，內含全部
@@ -212,8 +212,8 @@ Safari 或 Chrome 直接開啟本機 HTML 檔案，而「檔案」App 的預覽�
 開發環境（macOS／Windows 皆可）：
 
 ```bash
-git clone https://github.com/notoriouslab/myhealthbank.git
-cd myhealthbank/app
+git clone https://github.com/notoriouslab/health-workbench.git
+cd health-workbench/app
 npm ci          # 只裝 Tauri CLI，前端沒有依賴
 npx tauri dev   # 需先安裝 Rust 工具鏈
 ```
@@ -232,8 +232,8 @@ App 資料目錄一律不進版本控制，測試只用合成樣本）。
   `app/src/` 的 JS）；前端 Preact + htm（原始碼直接入庫，免建置）。
 - **命令列工具**：`src/`（Python 3.13 標準庫 + PyYAML）自 v0.3 起
   凍結新功能，作為 App 匯入引擎的差分驗收基準。常用：
-  `bin/mhb import <檔案>`、`bin/mhb rebuild`、`bin/mhb status`、
-  `bin/mhb knowledge update`（更新藥品品項快取，唯一主動連網的命令）。
+  `bin/hwb import <檔案>`、`bin/hwb rebuild`、`bin/hwb status`、
+  `bin/hwb knowledge update`（更新藥品品項快取，唯一主動連網的命令）。
 - **測試**：`cd app && npm test`（132 項，含與 Python 的逐位元組
   差分對帳、匯入與救援操作的非破壞性紅隊矩陣、檢視器全分頁渲染守衛）；
   `python3 -m pytest tests/`；端到端 `scripts/e2e_idempotency.sh`。

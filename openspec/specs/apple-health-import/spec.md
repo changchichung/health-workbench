@@ -25,7 +25,7 @@ incremental-merge 的自然鍵冪等共同保證重複匯入不增列
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -45,7 +45,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -70,7 +70,7 @@ quality_flag=epoch_placeholder_date；SHALL 對超出型別合理範圍的量測
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -88,7 +88,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->

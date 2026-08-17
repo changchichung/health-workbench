@@ -38,12 +38,12 @@ async function counts(d) {
 }
 
 test("backupFileName：日期戳檔名", () => {
-  assert.equal(backupFileName("2026-08-11"), "mhb-backup-20260811.sqlite");
+  assert.equal(backupFileName("2026-08-11"), "hwb-backup-20260811.sqlite");
 });
 
 test("VACUUM INTO 快照：版本與筆數全等、可重開、主庫可續寫", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "mhb-export-"));
-  const dest = join(dir, "mhb-backup-test.sqlite");
+  const dir = mkdtempSync(join(tmpdir(), "hwb-export-"));
+  const dest = join(dir, "hwb-backup-test.sqlite");
   const d = new NodeDriver();
   await initSchema(d);
   const p = await seed(d);
@@ -67,7 +67,7 @@ test("VACUUM INTO 快照：版本與筆數全等、可重開、主庫可續寫",
 });
 
 test("目標已存在：SQLite 拒絕且既有檔案逐位元組不變", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "mhb-export-"));
+  const dir = mkdtempSync(join(tmpdir(), "hwb-export-"));
   const dest = join(dir, "existing.sqlite");
   writeFileSync(dest, "既有內容不可動");
   const d = new NodeDriver();

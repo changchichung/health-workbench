@@ -45,9 +45,9 @@ test("匯入 fixture：與 Python CLI 同檔逐表筆數一致", async () => {
   const js = await new EngineStore(d).tableCounts();
   await d.close();
 
-  const tmp = mkdtempSync(path.join(tmpdir(), "mhb-parity-"));
+  const tmp = mkdtempSync(path.join(tmpdir(), "hwb-parity-"));
   const pyDb = path.join(tmp, "py.sqlite");
-  execFileSync("python3", ["-m", "src.mhb_cli", "--db", pyDb, "import",
+  execFileSync("python3", ["-m", "src.hwb_cli", "--db", pyDb, "import",
     FIXTURE, "--yes", "--no-rebuild"], { cwd: REPO, encoding: "utf-8" });
   const py = JSON.parse(execFileSync("python3", ["-c", [
     "import json, sys",

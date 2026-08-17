@@ -1,10 +1,10 @@
 // 資料庫定位（design D5）：系統 App 資料目錄＋環境變數覆寫（開發模式）。
 // 版本判定純函式獨立可測（tests/store/location.test.mjs）。
 
-export const DB_FILENAME = "mhb.sqlite";
+export const DB_FILENAME = "hwb.sqlite";
 
-// 解析資料庫路徑：MHB_DB_PATH 環境變數（經 shell 層 command）優先，
-// 否則 appDataDir/mhb.sqlite。回傳 { path, overridden }。
+// 解析資料庫路徑：HWB_DB_PATH 環境變數（經 shell 層 command）優先，
+// 否則 appDataDir/hwb.sqlite。回傳 { path, overridden }。
 export async function resolveDbPath() {
   const t = window.__TAURI__;
   const override = await t.core.invoke("env_db_override");
@@ -24,7 +24,7 @@ export async function inspectDbVersion(driver, supportedVersion) {
   } catch {
     return { ok: false, reason: "not_sqlite" };
   }
-  if (rows.length === 0) return { ok: false, reason: "not_mhb_db" };
+  if (rows.length === 0) return { ok: false, reason: "not_hwb_db" };
   const [{ v }] = await driver.select("SELECT MAX(version) v FROM schema_version");
   return classifyVersion(v, supportedVersion);
 }
@@ -56,12 +56,12 @@ export function preMigrationSnapshotName(fromVersion, isoDate, seq = 0) {
   if (!Number.isFinite(n) || n < 0) throw new Error("快照檔名：序號非有效整數");
   const d = String(isoDate).replaceAll("-", "");
   if (!/^\d{8}$/.test(d)) throw new Error("快照檔名：日期需為 YYYY-MM-DD");
-  return `mhb-premigrate-v${v}-${d}${n ? `-${n}` : ""}.sqlite`;
+  return `hwb-premigrate-v${v}-${d}${n ? `-${n}` : ""}.sqlite`;
 }
 
 // 純函式：版本分類（node:test 直測）
 export function classifyVersion(version, supportedVersion) {
-  if (version == null) return { ok: false, reason: "not_mhb_db" };
+  if (version == null) return { ok: false, reason: "not_hwb_db" };
   if (version > supportedVersion) return { ok: false, reason: "too_new", version };
   return { ok: true, version };
 }
@@ -84,7 +84,7 @@ export async function importExistingDb(srcPath, destPath, openDriver, supportedV
 
 // 匯出備份檔名：日期戳降低同名機率（app-shell spec 匯出資料庫檔）
 export function backupFileName(isoDate) {
-  return `mhb-backup-${isoDate.replaceAll("-", "")}.sqlite`;
+  return `hwb-backup-${isoDate.replaceAll("-", "")}.sqlite`;
 }
 
 // 一致性快照匯出：SQLite VACUUM INTO（單一交易視角、不中斷主庫、

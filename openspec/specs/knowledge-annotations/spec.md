@@ -28,7 +28,7 @@ SHALL 同時顯示來源名稱與引用日期。
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -49,7 +49,7 @@ knowledge 條目與 dashboard 顯示文案 MUST 通過禁用詞清單檢查
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -59,14 +59,14 @@ code:
 系統 SHALL 以醫囑代碼比對本機快取的健保藥品品項檔（記錄資料集
 版本日期），為每筆用藥提供商品名、成分名與食藥署仿單查詢連結；
 比對不到者 SHALL 顯示原始醫囑名稱並標 unmapped。快取更新 MUST 為
-使用者主動觸發（mhb knowledge update），MUST NOT 於匯入或建置時外連。
+使用者主動觸發（hwb knowledge update），MUST NOT 於匯入或建置時外連。
 
 #### Scenario: 藥品連結
 - **WHEN** 檢視任一筆醫囑代碼可對應品項檔的用藥紀錄
 - **THEN** 顯示成分名與仿單平台查詢連結，並標示品項檔版本日期
 
 #### Scenario: 離線建置
-- **WHEN** 無網路環境執行 mhb rebuild
+- **WHEN** 無網路環境執行 hwb rebuild
 - **THEN** 建置成功，藥品資訊使用既有快取
 
 
@@ -74,7 +74,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -86,13 +86,13 @@ code:
 
 #### Scenario: 引用過期
 - **WHEN** 條目 cited_date=2025-06-01，今日為 2026-08-08
-- **THEN** mhb quality 輸出該條目於過時清單
+- **THEN** hwb quality 輸出該條目於過時清單
 
 <!-- @trace
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->

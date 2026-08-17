@@ -1,3 +1,0 @@
-#!/bin/bash
-# mhb 啟動器：任何目錄皆可執行（自動定位 repo 根目錄）
-cd "$(dirname "$(readlink "$0" 2>/dev/null || echo "$0")")/.." && exec python3 -m src.mhb_cli "$@"

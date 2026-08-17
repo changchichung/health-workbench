@@ -5,7 +5,7 @@ import { runSmoke } from "../../src/store/smoke.js";
 import { classifyVersion } from "../../src/store/location.js";
 
 // App 內 spike（TauriDriver）跑同一 runSmoke 的期望輸出；
-// tests/verification 對照 /tmp/mhb_spike_result.json 的 smoke 欄位。
+// tests/verification 對照 /tmp/hwb_spike_result.json 的 smoke 欄位。
 // tableCount 為 schema 全表數（schema_version 亦計入）：v3 為 12，
 // v4 加 cpap_daily／cpap_events／cpap_oximetry 三表後為 15。
 // 新增表時此數字 MUST 同步，否則 App 端 spike 對帳會失敗。
@@ -29,5 +29,5 @@ test("classifyVersion：版本判定純函式", () => {
   assert.deepEqual(classifyVersion(3, 3), { ok: true, version: 3 });
   assert.deepEqual(classifyVersion(2, 3), { ok: true, version: 2 });
   assert.deepEqual(classifyVersion(9, 3), { ok: false, reason: "too_new", version: 9 });
-  assert.deepEqual(classifyVersion(null, 3), { ok: false, reason: "not_mhb_db" });
+  assert.deepEqual(classifyVersion(null, 3), { ok: false, reason: "not_hwb_db" });
 });

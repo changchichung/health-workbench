@@ -43,7 +43,7 @@ function day({ ahi = 24, ai = 24, hi = 0, dur = 170 } = {}) {
 const TODAY = "2026-08-13";
 
 async function cpapPayload({ withOximetry = false } = {}) {
-  const tmp = mkdtempSync(path.join(tmpdir(), "mhb-sleep-"));
+  const tmp = mkdtempSync(path.join(tmpdir(), "hwb-sleep-"));
   const d = new NodeDriver(path.join(tmp, "db.sqlite"));
   await initSchema(d);
   const pid = await createProfile(d, "測試成員");
@@ -86,7 +86,7 @@ async function cpapPayload({ withOximetry = false } = {}) {
 }
 
 async function nhiOnlyPayload() {
-  const tmp = mkdtempSync(path.join(tmpdir(), "mhb-sleep0-"));
+  const tmp = mkdtempSync(path.join(tmpdir(), "hwb-sleep0-"));
   const d = new NodeDriver(path.join(tmp, "db.sqlite"));
   await initSchema(d);
   const pid = await createProfile(d, "測試成員");
@@ -104,7 +104,7 @@ function renderViewer(payload) {
   const doc = makeDocument();
   const dataEl = doc.createElement("script");
   dataEl.textContent = JSON.stringify(payload);
-  doc.registerId("mhb-data", dataEl);
+  doc.registerId("hwb-data", dataEl);
   const root = doc.createElement("div");
   doc.registerId("app", root);
   const sandbox = {
@@ -295,7 +295,7 @@ test("匯出單檔 HTML：涵蓋 CPAP 區塊且通過契約與體積門檻", asy
 
   // 嵌入資料帶著 CPAP（注意 assemble 會跳脫 < > &，故比對鍵名而非整段）
   const embedded = JSON.parse(
-    html.match(/<script type="application\/json" id="mhb-data">(.*?)<\/script>/s)[1]
+    html.match(/<script type="application\/json" id="hwb-data">(.*?)<\/script>/s)[1]
       .replaceAll("\\u003c", "<").replaceAll("\\u003e", ">").replaceAll("\\u0026", "&"));
   assert.equal(embedded.cpap.daily.length, payload.cpap.daily.length);
   assert.ok(embedded.cpap.events.length > 0, "匯出檔缺呼吸事件");

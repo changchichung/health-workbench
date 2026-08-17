@@ -55,7 +55,7 @@ class Store:
                 if steps is None:
                     raise RuntimeError(
                         f"資料庫 schema 版本 {ver} 與程式 {SCHEMA_VERSION} 不符，"
-                        f"且無可用遷移路徑；請備份後以 mhb import 重建。")
+                        f"且無可用遷移路徑；請備份後以 hwb import 重建。")
                 for sql in steps:
                     cur.execute(sql)
                 ver += 1

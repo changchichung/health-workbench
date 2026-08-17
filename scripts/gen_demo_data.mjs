@@ -9,7 +9,7 @@
 //
 // 用法：node scripts/gen_demo_data.mjs [輸出目錄]
 //   產出 <輸出目錄>/demo.sqlite 與 <輸出目錄>/demo.html
-//   預設輸出目錄為系統暫存目錄下的 mhb-demo（不落在版本控制內）
+//   預設輸出目錄為系統暫存目錄下的 hwb-demo（不落在版本控制內）
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -20,7 +20,7 @@ import { buildPayload } from "../app/src/provider/payload.js";
 import { assemble } from "../app/src/provider/assemble.js";
 
 const REPO = new URL("..", import.meta.url).pathname;
-const OUT_DIR = process.argv[2] || path.join(tmpdir(), "mhb-demo");
+const OUT_DIR = process.argv[2] || path.join(tmpdir(), "hwb-demo");
 const DRUG_CACHE = path.join(REPO, "app/src-tauri/resources/drug_items.sqlite");
 const LAB_ENTRIES = JSON.parse(
   readFileSync(path.join(REPO, "app/src/knowledge/labs.json"), "utf-8"));

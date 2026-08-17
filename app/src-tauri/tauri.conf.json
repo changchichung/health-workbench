@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "MyHealthBank",
-  "version": "0.6.0",
-  "identifier": "com.notoriouslab.myhealthbank",
+  "productName": "HealthWorkbench",
+  "version": "0.7.0",
+  "identifier": "com.notoriouslab.healthworkbench",
   "build": {
     "frontendDist": "../src"
   },

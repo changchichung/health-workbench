@@ -29,9 +29,9 @@ test("匯入 apple fixture：與 Python CLI 同檔逐表筆數一致", async () 
   const js = await new EngineStore(d).tableCounts();
   await d.close();
 
-  const tmp = mkdtempSync(path.join(tmpdir(), "mhb-apple-"));
+  const tmp = mkdtempSync(path.join(tmpdir(), "hwb-apple-"));
   const pyDb = path.join(tmp, "py.sqlite");
-  execFileSync("python3", ["-m", "src.mhb_cli", "--db", pyDb, "import",
+  execFileSync("python3", ["-m", "src.hwb_cli", "--db", pyDb, "import",
     FIXTURE, "--yes", "--no-rebuild"], { cwd: REPO, encoding: "utf-8" });
   const py = JSON.parse(execFileSync("python3", ["-c", [
     "import json, sys",
@@ -83,7 +83,7 @@ test("檔內重複去除＋重複檔案跳過", async () => {
 });
 
 test("zip 匯入：壓縮後匯入結果與 XML 直接匯入等價（含中文檔名成員）", async () => {
-  const tmp = mkdtempSync(path.join(tmpdir(), "mhb-zip-"));
+  const tmp = mkdtempSync(path.join(tmpdir(), "hwb-zip-"));
   const xmlCopy = path.join(tmp, "輸出.xml");
   copyFileSync(FIXTURE, xmlCopy);
   const zipPath = path.join(tmp, "export.zip");
@@ -110,7 +110,7 @@ test("zip 匯入：壓縮後匯入結果與 XML 直接匯入等價（含中文�
 });
 
 test("資料夾情境：resolveAppleDirNode 找到非 cda 的 XML", async () => {
-  const tmp = mkdtempSync(path.join(tmpdir(), "mhb-dir-"));
+  const tmp = mkdtempSync(path.join(tmpdir(), "hwb-dir-"));
   copyFileSync(FIXTURE, path.join(tmp, "export_cda.xml"));
   copyFileSync(FIXTURE, path.join(tmp, "輸出.xml"));
   const resolved = await resolveAppleDirNode(tmp);

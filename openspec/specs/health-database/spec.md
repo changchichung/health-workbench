@@ -49,7 +49,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -61,7 +61,7 @@ quality_flags SHALL 為每筆資料的可累加欄位，聚合查詢與趨勢 MU
 品質報告 SHALL 按旗標統計筆數。
 
 #### Scenario: 品質報告
-- **WHEN** 執行 mhb quality
+- **WHEN** 執行 hwb quality
 - **THEN** 輸出各旗標筆數、unmapped 檢驗名清單、superseded 對照組數
 
 
@@ -69,7 +69,7 @@ quality_flags SHALL 為每筆資料的可累加欄位，聚合查詢與趨勢 MU
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -96,7 +96,7 @@ MUST NOT 合併為同一趨勢線。
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -130,7 +130,7 @@ code:
 source: cpap-sleep-therapy
 updated: 2026-08-13
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
   - docs/verification/cpap_schema_v4_migration.md
@@ -186,7 +186,7 @@ MAY 用於匯入當下的報告，MUST NOT 寫入 `source_documents`。
 source: cpap-sleep-therapy
 updated: 2026-08-14
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
   - docs/verification/cpap_schema_v4_migration.md

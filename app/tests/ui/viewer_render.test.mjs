@@ -24,7 +24,7 @@ const LAB_ENTRIES = JSON.parse(
   readFileSync(new URL("../../src/knowledge/labs.json", import.meta.url), "utf-8"));
 
 async function singleSourcePayload(kind) {
-  const tmp = mkdtempSync(path.join(tmpdir(), "mhb-vr-"));
+  const tmp = mkdtempSync(path.join(tmpdir(), "hwb-vr-"));
   const d = new NodeDriver(path.join(tmp, "db.sqlite"));
   await initSchema(d);
   const pid = await createProfile(d, "測試成員");
@@ -49,7 +49,7 @@ function renderViewer(payload) {
   const doc = makeDocument();
   const dataEl = doc.createElement("script");
   dataEl.textContent = JSON.stringify(payload);
-  doc.registerId("mhb-data", dataEl);
+  doc.registerId("hwb-data", dataEl);
   const root = doc.createElement("div");
   doc.registerId("app", root);
 

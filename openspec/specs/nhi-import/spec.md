@@ -30,7 +30,7 @@ MUST NOT 產生資料列。未知的新節區或未知欄位 MUST 保留於 extr
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -49,7 +49,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -69,7 +69,7 @@ r9_1（中醫醫囑）為用藥/處置明細，每筆 MUST 關聯所屬就醫事
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -89,7 +89,7 @@ MUST NOT 自動建新 profile 或混入現有 profile。
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -107,7 +107,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->

@@ -162,13 +162,13 @@ test("遷移前快照判定：全新庫不做、落後版本才做", async () =>
 
 test("遷移前快照檔名：帶來源版本與日期，同名附序號", () => {
   assert.equal(preMigrationSnapshotName(3, "2026-08-12"),
-    "mhb-premigrate-v3-20260812.sqlite");
+    "hwb-premigrate-v3-20260812.sqlite");
   assert.equal(preMigrationSnapshotName(3, "2026-08-12", 0),
-    "mhb-premigrate-v3-20260812.sqlite");
+    "hwb-premigrate-v3-20260812.sqlite");
   assert.equal(preMigrationSnapshotName(3, "2026-08-12", 2),
-    "mhb-premigrate-v3-20260812-2.sqlite");
+    "hwb-premigrate-v3-20260812-2.sqlite");
   assert.equal(preMigrationSnapshotName(1, "2026-01-05"),
-    "mhb-premigrate-v1-20260105.sqlite");
+    "hwb-premigrate-v1-20260105.sqlite");
 });
 
 test("遷移前快照檔名：拒絕會污染路徑的輸入", () => {
@@ -184,7 +184,7 @@ test("遷移前快照檔名：拒絕會污染路徑的輸入", () => {
     /日期需為 YYYY-MM-DD/);
   // 數字字串（來自 driver 的正常回傳型別差異）仍應可用
   assert.equal(preMigrationSnapshotName("3", "2026-08-12"),
-    "mhb-premigrate-v3-20260812.sqlite");
+    "hwb-premigrate-v3-20260812.sqlite");
 });
 
 test("MIGRATIONS[3] 每個元素為單一語句（Python 端逐句 execute）", () => {

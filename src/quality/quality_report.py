@@ -1,6 +1,6 @@
 """品質報告產生模組：固定結構 JSON（八個頂層欄位有序）＋人讀摘要。
 
-`mhb import` 印當次增量；`mhb quality` 印全庫彙整。兩者共用本模組。
+`hwb import` 印當次增量；`hwb quality` 印全庫彙整。兩者共用本模組。
 結構依 design.md Implementation Contract。
 """
 import json
@@ -42,7 +42,7 @@ def build_incremental(store, *, source_info, sections):
 
 
 def build_full(store, stale_knowledge=None):
-    """全庫彙整報告（mhb quality）：唯讀，不重新解析任何來源檔。"""
+    """全庫彙整報告（hwb quality）：唯讀，不重新解析任何來源檔。"""
     docs = store.con.execute(
         "SELECT filename, adapter, adapter_version, imported_at FROM source_documents"
         " ORDER BY imported_at").fetchall()

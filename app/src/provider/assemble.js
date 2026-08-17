@@ -51,7 +51,7 @@ export function assemble(payload, assets) {
 <div id="app"><p>載入中…若一直停在這行，表示目前的開啟方式不會執行網頁程式
 （例如 iOS「檔案」App 的預覽視窗）。電腦上請用瀏覽器開啟本檔；iPhone、
 iPad 請改用「HTML &amp; Markdown 檢視器」這類會執行網頁程式的 App。</p></div>
-<script type="application/json" id="mhb-data">${toEmbeddedJson(payload)}</script>
+<script type="application/json" id="hwb-data">${toEmbeddedJson(payload)}</script>
 <script>${assets.vendor.join("\n")}</script>
 <script>${assets.appJs}</script>
 </body>

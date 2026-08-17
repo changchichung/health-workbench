@@ -1,4 +1,4 @@
-MyHealthBank 個人健康資料工作台（Windows）
+HealthWorkbench 個人健康資料工作台（Windows）
 ==================================================
 
 把健保「健康存摺」與 Apple 健康的下載檔，整理成可累積、可搜尋、
@@ -10,10 +10,10 @@ MyHealthBank 個人健康資料工作台（Windows）
 
 兩種安裝檔任選一個，內容相同：
 
-  MyHealthBank_x.y.z_x64-setup.exe   一般安裝程式
-  MyHealthBank_x.y.z_x64_en-US.msi   企業部署常用格式
+  HealthWorkbench_x.y.z_x64-setup.exe   一般安裝程式
+  HealthWorkbench_x.y.z_x64_en-US.msi   企業部署常用格式
 
-雙擊執行即可，安裝完成後在「開始」功能表找到 MyHealthBank。
+雙擊執行即可，安裝完成後在「開始」功能表找到 HealthWorkbench。
 
 
 二、第一次執行（重要）
@@ -69,10 +69,10 @@ MyHealthBank 個人健康資料工作台（Windows）
 四、你的資料存在哪裡
 --------------------------------------------------
 
-  %APPDATA%\com.notoriouslab.myhealthbank\
+  %APPDATA%\com.notoriouslab.healthworkbench\
 
 （在檔案總管的位址欄直接貼上這行按 Enter 就會打開；完整路徑是
-  C:\Users\你的帳號\AppData\Roaming\com.notoriouslab.myhealthbank\）
+  C:\Users\你的帳號\AppData\Roaming\com.notoriouslab.healthworkbench\）
 
 檢視資料的過程不需要網路，也不會對外連線；只有點擊藥品仿單
 這類外部連結時才會開啟瀏覽器。
@@ -83,7 +83,7 @@ MyHealthBank 個人健康資料工作台（Windows）
 五、說明與原始碼
 --------------------------------------------------
 
-  https://github.com/notoriouslab/myhealthbank
+  https://github.com/notoriouslab/health-workbench
 
 
 --------------------------------------------------

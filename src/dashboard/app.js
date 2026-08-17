@@ -1,8 +1,8 @@
-/* mhb dashboard 前端：總覽 / 時間軸 / 用藥 / 趨勢 ＋ 全文搜尋。
+/* hwb dashboard 前端：總覽 / 時間軸 / 用藥 / 趨勢 ＋ 全文搜尋。
    Preact + htm（vendored），零執行期網路請求；外部連結僅使用者點擊才離開。 */
 (function () {
   "use strict";
-  const DATA = JSON.parse(document.getElementById("mhb-data").textContent);
+  const DATA = JSON.parse(document.getElementById("hwb-data").textContent);
 
   /* ---------- CPAP（睡眠呼吸） ---------- */
   // payload 可能來自尚無 CPAP 區塊的舊版本，一律防禦性取值

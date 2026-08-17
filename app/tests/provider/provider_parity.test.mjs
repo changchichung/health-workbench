@@ -51,7 +51,7 @@ function pyPayload(dbPath) {
 const stripTs = (p) => { const c = JSON.parse(JSON.stringify(p)); delete c.meta.generated_at; return c; };
 
 test("provider 同構：JS payload 與 Python build_payload 數值全等", async () => {
-  const tmp = mkdtempSync(path.join(tmpdir(), "mhb-prov-"));
+  const tmp = mkdtempSync(path.join(tmpdir(), "hwb-prov-"));
   const dbPath = path.join(tmp, "db.sqlite");
   const d = await buildDb(dbPath);
   const js = await buildPayload(d, { profileId: d.pid,
@@ -62,8 +62,8 @@ test("provider 同構：JS payload 與 Python build_payload 數值全等", async
   assert.deepEqual(stripTs(JSON.parse(JSON.stringify(js))), stripTs(py));
 });
 
-test("匯出同構：assemble 輸出的嵌入資料與 mhb rebuild 產出全等", async () => {
-  const tmp = mkdtempSync(path.join(tmpdir(), "mhb-exp-"));
+test("匯出同構：assemble 輸出的嵌入資料與 hwb rebuild 產出全等", async () => {
+  const tmp = mkdtempSync(path.join(tmpdir(), "hwb-exp-"));
   const dbPath = path.join(tmp, "db.sqlite");
   const d = await buildDb(dbPath);
   const js = await buildPayload(d, { profileId: d.pid,
@@ -78,13 +78,13 @@ test("匯出同構：assemble 輸出的嵌入資料與 mhb rebuild 產出全等"
   };
   const html = assemble(js, assets);
 
-  execFileSync("python3", ["-m", "src.mhb_cli", "--db", dbPath, "rebuild",
+  execFileSync("python3", ["-m", "src.hwb_cli", "--db", dbPath, "rebuild",
     "--out", tmp], { cwd: REPO, encoding: "utf-8" });
   const pyHtml = readFileSync(path.join(tmp,
     readdirSync(tmp).find(f => f.endsWith(".html"))), "utf-8");
 
   const extract = (h) => JSON.parse(
-    h.match(/<script type="application\/json" id="mhb-data">(.*?)<\/script>/s)[1]
+    h.match(/<script type="application\/json" id="hwb-data">(.*?)<\/script>/s)[1]
       .replaceAll("\\u003c", "<").replaceAll("\\u003e", ">").replaceAll("\\u0026", "&"));
   assert.deepEqual(stripTs(extract(html)), stripTs(extract(pyHtml)));
 });

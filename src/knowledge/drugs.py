@@ -1,4 +1,4 @@
-"""健保用藥品項本機快取（D4）：mhb knowledge update 手動更新，建置不外連。
+"""健保用藥品項本機快取（D4）：hwb knowledge update 手動更新，建置不外連。
 
 資料集：健保用藥品項查詢項目檔（data.gov.tw/dataset/23715，政府資料開放授權）
 下載端點：https://info.nhi.gov.tw/api/iode0000s01/Dataset?rId=A21030000I-E41001-001

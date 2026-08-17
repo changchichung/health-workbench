@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Phase 0 最小驗證：解析健康存摺醫療類 JSON，正規化後寫入 SQLite。
 
-用法：python3 parse_mhb.py <健康存摺醫療類_YYYMMDD.JSON> [output_dir]
+用法：python3 parse_hwb.py <健康存摺醫療類_YYYMMDD.JSON> [output_dir]
 
 輸出：
-  output/mhb.sqlite       正規化資料庫（encounters/medications/lab_results/...）
+  output/hwb.sqlite       正規化資料庫（encounters/medications/lab_results/...）
   output/quality_report.json  資料品質報告
 每筆正規化資料都保留 source_section 與 source_index，可追溯到原始 JSON 位置。
 """
@@ -70,7 +70,7 @@ def main():
     # 節區代碼大小寫不一致（r1..r11 小寫、R12..R14 大寫），統一小寫
     bdata = {k.lower(): v for k, v in bdata.items()}
 
-    db_path = out_dir / "mhb.sqlite"
+    db_path = out_dir / "hwb.sqlite"
     db_path.unlink(missing_ok=True)
     con = sqlite3.connect(db_path)
     cur = con.cursor()

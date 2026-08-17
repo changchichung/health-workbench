@@ -65,7 +65,7 @@ on run argv
       set opts to the icon view options of container window
       set arrangement of opts to not arranged
       set icon size of opts to 96
-      set position of item "MyHealthBank.app" of container window to {150, 170}
+      set position of item "HealthWorkbench.app" of container window to {150, 170}
       set position of item "Applications" of container window to {470, 170}
       set position of item txtName of container window to {310, 350}
       close
@@ -95,7 +95,7 @@ hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -o "$OUT" >/dev/null
 hdiutil attach "$OUT" -nobrowse -noautoopen -readonly -mountpoint "$VERIFY" >/dev/null
 ok=1
 [ -f "$VERIFY/$DEST_NAME" ] || { echo "驗證失敗：最終 DMG 缺說明檔" >&2; ok=0; }
-[ -d "$VERIFY/MyHealthBank.app" ] || { echo "驗證失敗：最終 DMG 缺 App" >&2; ok=0; }
+[ -d "$VERIFY/HealthWorkbench.app" ] || { echo "驗證失敗：最終 DMG 缺 App" >&2; ok=0; }
 # 圖示可見性斷言：.DS_Store 若存在，說明檔 MUST 有座標記錄且落在視窗內；
 # 沒有 .DS_Store 則是自動排列路徑（一律可見），兩者皆可，其他情況擋下。
 DS="$VERIFY/.DS_Store" python3 - "$DEST_NAME" <<'PYCHECK' || ok=0

@@ -1,4 +1,4 @@
-MyHealthBank 個人健康資料工作台
+HealthWorkbench 個人健康資料工作台
 ==================================================
 
 把健保「健康存摺」與 Apple 健康的下載檔，整理成可累積、可搜尋、
@@ -8,7 +8,7 @@ MyHealthBank 個人健康資料工作台
 一、安裝
 --------------------------------------------------
 
-把這個視窗裡的 MyHealthBank 圖示，拖到旁邊的「應用程式」資料夾。
+把這個視窗裡的 HealthWorkbench 圖示，拖到旁邊的「應用程式」資料夾。
 
 
 二、第一次開啟（重要）
@@ -20,18 +20,18 @@ Apple 公證，可以直接使用，下面可以跳過。
 如果出現「無法打開，因為無法確認開發者的身分」，或「Apple
 無法檢查 App 是否含有惡意軟體」，需要放行一次（只需做一次）：
 
-  1. 打開「應用程式」資料夾，找到 MyHealthBank
+  1. 打開「應用程式」資料夾，找到 HealthWorkbench
   2. 按住 Control 鍵並點一下它的圖示，選「開啟」
   3. 對話框出現後，再點一次「開啟」
 
 如果選單裡沒有「開啟」，改用這個方式：
 
   系統設定 → 隱私權與安全性 → 往下捲動找到
-  「MyHealthBank 已被阻擋」→ 點「仍要開啟」
+  「HealthWorkbench 已被阻擋」→ 點「仍要開啟」
 
 熟悉終端機的話，執行一次這行也可以：
 
-  xattr -cr /Applications/MyHealthBank.app
+  xattr -cr /Applications/HealthWorkbench.app
 
 
 三、怎麼用（三步）
@@ -70,7 +70,7 @@ Apple 公證，可以直接使用，下面可以跳過。
 四、你的資料存在哪裡
 --------------------------------------------------
 
-  ~/Library/Application Support/com.notoriouslab.myhealthbank/
+  ~/Library/Application Support/com.notoriouslab.healthworkbench/
 
 檢視資料的過程不需要網路，也不會對外連線；只有點擊藥品仿單
 這類外部連結時才會開啟瀏覽器。
@@ -80,7 +80,7 @@ Apple 公證，可以直接使用，下面可以跳過。
 五、說明與原始碼
 --------------------------------------------------
 
-  https://github.com/notoriouslab/myhealthbank
+  https://github.com/notoriouslab/health-workbench
 
 
 --------------------------------------------------

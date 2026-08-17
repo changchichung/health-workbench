@@ -6,7 +6,7 @@ import pytest
 
 
 def run_cli(*argv):
-    return subprocess.run([sys.executable, "-m", "src.mhb_cli", *argv],
+    return subprocess.run([sys.executable, "-m", "src.hwb_cli", *argv],
                           capture_output=True, text=True)
 
 

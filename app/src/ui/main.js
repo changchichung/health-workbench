@@ -149,7 +149,7 @@ async function migrateWithSnapshot() {
     }
     if (!dest) {
       throw new Error("升級資料庫前的自動備份無法命名（同日備份過多），"
-        + "為保護既有資料已停止升級，請先整理資料目錄內的 mhb-premigrate-* 檔案。");
+        + "為保護既有資料已停止升級，請先整理資料目錄內的 hwb-premigrate-* 檔案。");
     }
     try {
       await exportDbSnapshot(app.driver, dest);
@@ -284,7 +284,7 @@ async function wireUi() {
   });
 
   document.getElementById("db-import-btn").addEventListener("click", async () => {
-    const p = await dialogOpen({ multiple: false, title: "選擇既有的 mhb.sqlite" });
+    const p = await dialogOpen({ multiple: false, title: "選擇既有的 hwb.sqlite" });
     if (!p) return;
     const r = await importExisting(p);
     if (r?.ok) {
@@ -368,7 +368,7 @@ async function wireUi() {
   // opener 插件到位後改直接開瀏覽器（2026-08-11 指示；剪貼簿方案退場），
   // 開啟失敗回退複製，確保任何情況都有路可走
   document.getElementById("gh-open-btn").addEventListener("click", async () => {
-    const url = "https://github.com/notoriouslab/myhealthbank";
+    const url = "https://github.com/notoriouslab/health-workbench";
     try {
       await window.__TAURI__.opener.openUrl(url);
     } catch {

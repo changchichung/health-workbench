@@ -78,6 +78,6 @@ jobs:
       - name: 上傳安裝包
         uses: actions/upload-artifact@v4
         with:
-          name: myhealthbank-${{ matrix.platform }}
+          name: health-workbench-${{ matrix.platform }}
           path: ${{ matrix.bundle_glob }}
           if-no-files-found: error

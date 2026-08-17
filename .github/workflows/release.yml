@@ -132,20 +132,20 @@ jobs:
         with:
           projectPath: app
           tagName: v${{ needs.version-gate.outputs.version }}
-          releaseName: "MyHealthBank v${{ needs.version-gate.outputs.version }}"
+          releaseName: "HealthWorkbench v${{ needs.version-gate.outputs.version }}"
           # 放行步驟是「能不能跑起來」的關鍵，release 頁必須自帶完整版，
           # 不要只寫「見 README」
           releaseBody: |
             ### 下載
 
-            - **macOS**：`MyHealthBank_${{ needs.version-gate.outputs.version }}_aarch64.dmg`（Apple Silicon）
-            - **Windows**：`MyHealthBank_${{ needs.version-gate.outputs.version }}_x64-setup.exe`
-              或 `MyHealthBank_${{ needs.version-gate.outputs.version }}_x64_en-US.msi`，
+            - **macOS**：`HealthWorkbench_${{ needs.version-gate.outputs.version }}_aarch64.dmg`（Apple Silicon）
+            - **Windows**：`HealthWorkbench_${{ needs.version-gate.outputs.version }}_x64-setup.exe`
+              或 `HealthWorkbench_${{ needs.version-gate.outputs.version }}_x64_en-US.msi`，
               使用說明請一併下載 `README-Windows.txt`（繁體中文）
 
             ### 首次開啟
 
-            ${{ steps.signing.outputs.enabled == 'true' && '- **macOS**：本版已簽章並通過 Apple 公證，直接開啟即可，不需要手動放行。' || '- **macOS**：本版尚未簽章，首次開啟需手動放行：按住 Control 點 App 圖示 →「開啟」（或系統設定 → 隱私權與安全性 → 仍要開啟）；或在終端機執行一次 `xattr -cr /Applications/MyHealthBank.app`' }}
+            ${{ steps.signing.outputs.enabled == 'true' && '- **macOS**：本版已簽章並通過 Apple 公證，直接開啟即可，不需要手動放行。' || '- **macOS**：本版尚未簽章，首次開啟需手動放行：按住 Control 點 App 圖示 →「開啟」（或系統設定 → 隱私權與安全性 → 仍要開啟）；或在終端機執行一次 `xattr -cr /Applications/HealthWorkbench.app`' }}
             - **Windows**：安裝檔未經簽章，SmartScreen 出現時點「其他資訊」→「仍要執行」
 
             DMG 內另附「使用說明（請先閱讀）.txt」，放行與上手步驟都在裡面。
@@ -154,8 +154,8 @@ jobs:
 
             ### 其他
 
-            完整說明見 [README](https://github.com/notoriouslab/myhealthbank#readme)，
-            變更明細見 [CHANGELOG](https://github.com/notoriouslab/myhealthbank/blob/main/CHANGELOG.md)。
+            完整說明見 [README](https://github.com/notoriouslab/health-workbench#readme)，
+            變更明細見 [CHANGELOG](https://github.com/notoriouslab/health-workbench/blob/main/CHANGELOG.md)。
           releaseDraft: true
           prerelease: false
       # macOS 後處理順序是硬約束：塞說明檔會用 hdiutil 重建映像，DMG 層

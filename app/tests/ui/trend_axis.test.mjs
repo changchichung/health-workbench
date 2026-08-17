@@ -27,7 +27,7 @@ const iso = (t) => new Date(t).toISOString().slice(0, 10);
 /* 建一顆形狀貼近生產庫實測形狀的庫 */
 async function shapePayload({ nullLabDate = false, staleAll = false,
   latestAfterGenerated = false, weightEveryOtherDay = false, ancientDate = false } = {}) {
-  const d = new NodeDriver(path.join(mkdtempSync(path.join(tmpdir(), "mhb-ta-")), "db.sqlite"));
+  const d = new NodeDriver(path.join(mkdtempSync(path.join(tmpdir(), "hwb-ta-")), "db.sqlite"));
   await initSchema(d);
   const pid = await createProfile(d, "示範");
   const doc = {};
@@ -111,7 +111,7 @@ function render(payload) {
   const doc = makeDocument();
   const dataEl = doc.createElement("script");
   dataEl.textContent = JSON.stringify(payload);
-  doc.registerId("mhb-data", dataEl);
+  doc.registerId("hwb-data", dataEl);
   const root = doc.createElement("div");
   doc.registerId("app", root);
   const sandbox = { document: doc, console, setTimeout, clearTimeout,

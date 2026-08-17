@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase 0：解析 Apple Health 匯出 XML，寫入 mhb.sqlite 的 apple_records 表。
+"""Phase 0：解析 Apple Health 匯出 XML，寫入 hwb.sqlite 的 apple_records 表。
 
 設計重點（對應「跨批次累加合併」規格需求）：
 - 以 (type, start_ts, end_ts, source_name, value) 為自然鍵建 UNIQUE 索引，
@@ -53,7 +53,7 @@ EPOCH_PLACEHOLDER = "1970-01-01"
 
 def main():
     xml_path = Path(sys.argv[1])
-    db_path = Path(sys.argv[2]) if len(sys.argv) > 2 else Path(__file__).parent / "output" / "mhb.sqlite"
+    db_path = Path(sys.argv[2]) if len(sys.argv) > 2 else Path(__file__).parent / "output" / "hwb.sqlite"
     con = sqlite3.connect(db_path)
     cur = con.cursor()
     cur.executescript("""

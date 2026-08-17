@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase 0：從 mhb.sqlite 產出本機 HTML 驗證報告（output/report.html）。
+"""Phase 0：從 hwb.sqlite 產出本機 HTML 驗證報告（output/report.html）。
 報告含個人醫療資料，只留本機，不得發佈或 commit。"""
 import json
 import sqlite3
@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 
 OUT = Path(__file__).parent / "output"
-con = sqlite3.connect(OUT / "mhb.sqlite")
+con = sqlite3.connect(OUT / "hwb.sqlite")
 con.row_factory = sqlite3.Row
 cur = con.cursor()
 

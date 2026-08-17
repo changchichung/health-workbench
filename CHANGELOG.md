@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0（2026-08-17）CPAP 睡眠呼吸與趨勢圖時間軸
+## 0.7.0（2026-08-17）CPAP 睡眠呼吸與趨勢圖時間軸
 
 ### CPAP 睡眠呼吸資料匯入（Phase 1：ResMed 原生 EDF）
 
@@ -193,13 +193,13 @@
 - 藥↔看診雙向跳轉、搜尋結果全面可點選並捲動定位
 - 匯入紀錄：每次匯入的時間/檔案/新增統計（schema v3＋前向遷移機制）
 - 韌性：單筆壞紀錄續行不中止整批（parse_errors 進品質報告）
-- bin/mhb 啟動器（任意目錄可執行）
+- bin/hwb 啟動器（任意目錄可執行）
 - 審計：Jenny 規格符合度（5 發現全修）＋Karen 現實檢核（1 發現已修），
   紀錄於 docs/verification/
 
 ## 0.1.0（2026-08-08）MVP 核心四件套
 
-- `mhb` CLI：import（自動判型、冪等）/ rebuild / status / quality / knowledge update
+- `hwb` CLI：import（自動判型、冪等）/ rebuild / status / quality / knowledge update
 - 健保存摺醫療類 JSON adapter：14 節區、藥局調劑回退、醫囑對帳、遮罩身分證歸戶
 - Apple Health adapter：串流解析、來源別單位修正、epoch/離群旗標、檔內去重
 - 跨批次累加合併：內容指紋（D1）、視窗接續、疑似改版偵測、步數防雙計

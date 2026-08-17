@@ -31,7 +31,7 @@ record_fp，並以 UNIQUE(profile_id, section, record_fp) 約束防重。
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -51,7 +51,7 @@ superseded_candidate 對照組，MUST NOT 自動刪除或覆蓋任一筆。
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -70,7 +70,7 @@ Apple 紀錄 SHALL 以 UNIQUE(type, start_ts, end_ts, source_name, value)
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
@@ -88,7 +88,7 @@ code:
 source: mvp-core-dashboard
 updated: 2026-08-09
 code:
-  - bin/mhb
+  - bin/hwb
   - docs/verification/karen_reality.md
   - README.md
 -->
