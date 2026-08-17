@@ -1,6 +1,6 @@
 [package]
 name = "myhealthbank-app"
-version = "0.5.0"
+version = "0.6.0"
 description = "多來源個人健康資料工作台桌面版"
 edition = "2021"
 
