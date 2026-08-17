@@ -60,10 +60,27 @@ if [ "$MODE" = "signed" ]; then
   xcrun stapler validate "$DMG" || { echo "::error::DMG 沒有公證票據"; fail=1; }
 
   echo "── 4. Gatekeeper 評估（僅在該機器啟用評估時才有判定力）"
+  # 評估類型 MUST 是 `open` 且帶 --context context:primary-signature：那是
+  # Apple 對「磁碟映像」的評估方式，正確時回 accepted 與
+  # source=Notarized Developer ID。
+  # NEVER 用 -t install（那是 installer package/.pkg 專用）或預設的 -t exec
+  # （可執行檔專用）：對 DMG 一律回 `rejected / source=no usable signature`，
+  # 與票據是否存在無關，是**必假紅**。2026-08-17 v0.6.0 首次簽章發布實踩：
+  # 前三項硬判準全過（憑證類型、嚴格驗證、App 與 DMG 兩層票據皆 validate
+  # 成功），只有這條紅，整個發布被自己的驗收線擋死。
   SPCTL_STATUS="$(spctl --status 2>&1 || true)"
   case "$SPCTL_STATUS" in
     *"assessments enabled"*)
-      spctl -a -vvv -t install "$DMG" || { echo "::error::Gatekeeper 拒絕此 DMG"; fail=1; } ;;
+      # 判定命令的輸出先收變數再比對，NEVER 接 pipe（SIGPIPE 假紅）；
+      # 失敗時原樣印出，才診斷得了。
+      SPCTL_OUT="$(spctl -a -t open --context context:primary-signature -vvv "$DMG" 2>&1 || true)"
+      case "$SPCTL_OUT" in
+        *accepted*) echo "  OK（${SPCTL_OUT##*source=}）" ;;
+        *)
+          echo "::error::Gatekeeper 拒絕此 DMG"
+          printf '%s\n' "$SPCTL_OUT"
+          fail=1 ;;
+      esac ;;
     *)
       echo "::warning::此機器的 Gatekeeper 評估已停用，spctl 無判定力，略過（前三項仍具約束力）" ;;
   esac
