@@ -188,15 +188,32 @@ jobs:
       # 本身未被惡意修改；且未簽章的 DMG 在 Gatekeeper 評估中會回
       # 「no usable signature」（2026-08-17 v0.6.0 首次簽章發布連兩輪紅在
       # 這裡，前三項硬判準全過）。
+      # 這個 step MUST 自己建 keychain 匯入憑證：tauri-action 的臨時 keychain
+      # 只在它自己的 step 內可見，這裡直接 codesign 會得到
+      # 「no identity found」（2026-08-17 實踩）。本機驗證時若預先把憑證放進
+      # keychain 再測，就驗不出這個差異——驗證環境 MUST 對準 CI 的乾淨環境。
       - name: DMG 簽章（僅 macOS，簽章版）
         if: matrix.platform == 'macos-latest' && steps.signing.outputs.enabled == 'true'
         shell: bash
         env:
           IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          CERT_B64: ${{ secrets.APPLE_CERTIFICATE }}
+          CERT_PW: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
           set -euo pipefail
           DMG="${{ steps.bundle.outputs.dmg }}"
-          codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+          KC="$RUNNER_TEMP/dmgsign.keychain"
+          KCPW="$(openssl rand -base64 24)"
+          P12="$RUNNER_TEMP/dmgsign.p12"
+          cleanup() { rm -f "$P12"; security delete-keychain "$KC" 2>/dev/null || true; }
+          trap cleanup EXIT
+          printf '%s' "$CERT_B64" | openssl base64 -d -A -out "$P12"
+          security create-keychain -p "$KCPW" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KCPW" "$KC"
+          security import "$P12" -k "$KC" -P "$CERT_PW" -T /usr/bin/codesign -A
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          codesign --force --timestamp --keychain "$KC" --sign "$IDENTITY" "$DMG"
           # 判定命令的輸出先收變數再比對，NEVER 接 pipe（SIGPIPE 假紅）
           DMG_SIGN="$(codesign -dv --verbose=4 "$DMG" 2>&1 || true)"
           case "$DMG_SIGN" in
