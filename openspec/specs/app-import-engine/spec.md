@@ -2,7 +2,11 @@
 
 ## Purpose
 
-TBD - created by archiving change 'tauri-desktop-app'. Update Purpose after archive.
+App 內建的匯入引擎：把原本 Python CLI 的匯入能力搬進桌面 App，涵蓋
+儲存存取抽象、串流解析與大檔門檻、adapter 註冊制，以及多檔來源的原子性
+與逐檔韌性。核心約束是與既有匯入 specs（nhi-import、apple-health-import、
+incremental-merge）行為等價，且匯入 MUST NOT 破壞既有資料
+（change tauri-desktop-app，2026-08-10）。
 
 ## Requirements
 

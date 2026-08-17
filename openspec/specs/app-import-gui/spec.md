@@ -2,7 +2,10 @@
 
 ## Purpose
 
-TBD - created by archiving change 'tauri-desktop-app'. Update Purpose after archive.
+匯入流程的使用者介面層：選檔與拖放、進度與結果報告、匯入歸屬選擇、
+防護情境（重複檔、歸戶不符、壞檔）的呈現，以及匯入紀錄卡的批次摺疊與
+批次救援入口。與 app-import-engine 的引擎行為分層，介面只負責呈現與
+確認（change tauri-desktop-app，2026-08-10）。
 
 ## Requirements
 

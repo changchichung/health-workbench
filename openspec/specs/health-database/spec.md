@@ -2,7 +2,10 @@
 
 ## Purpose
 
-TBD - created by archiving change 'mvp-core-dashboard'. Update Purpose after archive.
+SQLite schema 的 SSOT：多人預留欄位、來源追溯、品質旗標貫穿、檢驗名稱
+正規化欄位、schema 版本化與遷移、匯入統計記錄，以及 CPAP 三張資料表。
+JS 與 Python 兩端實作 MUST 逐字同步（空庫 schema dump 全等）
+（change mvp-core-dashboard，2026-08-09）。
 
 ## Requirements
 

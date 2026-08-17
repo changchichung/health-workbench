@@ -2,7 +2,9 @@
 
 ## Purpose
 
-TBD - created by archiving change 'mvp-core-dashboard'. Update Purpose after archive.
+健保個人健康存摺資料的匯入：14 節區完整解析、藥局交付調劑日期回退、
+巢狀醫囑明細完整入庫、遮罩身分證歸戶，以及檔案指紋防重複匯入
+（change mvp-core-dashboard，2026-08-09）。
 
 ## Requirements
 

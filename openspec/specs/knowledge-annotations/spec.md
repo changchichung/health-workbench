@@ -2,7 +2,10 @@
 
 ## Purpose
 
-TBD - created by archiving change 'mvp-core-dashboard'. Update Purpose after archive.
+檢驗與藥品的知識標註：條目結構與來源標註、非結論式用語約束、藥品資訊
+對接與過時提醒。用語約束以禁用詞守衛落實，掃描 `app/src` 全部檔案內容
+含註解，確保介面只呈現數值與出處而不作判定
+（change mvp-core-dashboard，2026-08-09）。
 
 ## Requirements
 

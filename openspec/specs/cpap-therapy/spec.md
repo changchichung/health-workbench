@@ -2,7 +2,11 @@
 
 ## Purpose
 
-TBD - created by archiving change 'cpap-sleep-therapy'. Update Purpose after archive.
+CPAP（陽壓呼吸器）記錄卡的匯入與檢視：入庫粒度（每日摘要、逐次呼吸
+事件、睡眠期血氧逐分鐘聚合）、紀錄夜的日期歸屬、缺測值判定、呼吸事件
+分類、多裝置共存，以及只顯示不解讀的呈現約束。分階段實作，Phase 1 為
+ResMed 原生 EDF；schema 以跨廠牌共通的臨床量設計，避免後續階段被迫遷移
+（change cpap-sleep-therapy，2026-08-13）。
 
 ## Requirements
 

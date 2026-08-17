@@ -2,7 +2,10 @@
 
 ## Purpose
 
-TBD - created by archiving change 'mvp-core-dashboard'. Update Purpose after archive.
+Apple 健康匯出檔（export.xml）的匯入：串流解析與型別擷取、來源別的單位
+正規化、佔位日期與離群值的品質旗標，以及匯出檔內部的重複去除。與
+incremental-merge 的自然鍵冪等共同保證重複匯入不增列
+（change mvp-core-dashboard，2026-08-09）。
 
 ## Requirements
 

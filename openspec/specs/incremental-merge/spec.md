@@ -2,7 +2,10 @@
 
 ## Purpose
 
-TBD - created by archiving change 'mvp-core-dashboard'. Update Purpose after archive.
+重複匯入的冪等與合併語意：健保紀錄的內容指紋、疑似改版紀錄偵測、Apple
+紀錄的自然鍵冪等，以及跨來源的重複計數防護。目標是同一份資料匯入多次
+不增列、也不因來源不同而被重複計算（change mvp-core-dashboard，
+2026-08-09）。
 
 ## Requirements
 

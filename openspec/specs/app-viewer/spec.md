@@ -2,7 +2,10 @@
 
 ## Purpose
 
-TBD - created by archiving change 'tauri-desktop-app'. Update Purpose after archive.
+App 內的即時檢視層：DataProvider 契約、四分頁即時檢視、成員切換與依人
+檢視、單檔 HTML 匯出，以及趨勢圖的共用時間域定位、區間選擇、標記降級與
+日期健全性。要求 dashboard-generator 的既有互動行為在 App 內全數不退化
+（change tauri-desktop-app，2026-08-10）。
 
 ## Requirements
 

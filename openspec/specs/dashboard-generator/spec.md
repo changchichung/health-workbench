@@ -2,7 +2,10 @@
 
 ## Purpose
 
-TBD - created by archiving change 'mvp-core-dashboard'. Update Purpose after archive.
+單檔自足的 HTML 檢視產出：資料嵌入分層與體積上限、四件套視圖、客戶端
+全文搜尋、篩選連動、用藥醫令分類、處方時間軸展開與搜尋結果跳轉，以及
+個資與醫療邊界防護。其互動行為同時是 app-viewer 的不退化基準
+（change mvp-core-dashboard，2026-08-09）。
 
 ## Requirements
 
