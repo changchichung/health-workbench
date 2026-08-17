@@ -121,7 +121,7 @@ export function createImportFlow({ getDriver, labEntries, onImported,
       state = "idle";
       say("");
       const raw = String(err?.message || err);
-      reportBox.innerHTML = `<p class="warn">無法讀取這個來源，資料庫未寫入任何資料。</p>`
+      reportBox.innerHTML = `<p class="warn">${escapeHtml(readFailureMessage(raw))}</p>`
         + `<details><summary>技術細節</summary><p>${escapeHtml(raw)}</p></details>`;
       show(reportBox);
       return { state, error: raw };
@@ -383,6 +383,32 @@ export function createImportFlow({ getDriver, labEntries, onImported,
 }
 
 // 錯誤訊息友善化（Karen 收尾檢核發現：技術訊息外洩）。回傳 [主訊息, 技術細節]
+// 讀取階段失敗的措辭。fs scope 類失敗要給出「怎麼做才會成功」而不只是
+// 「失敗了」：拖放（tauri://drag-drop）只拿到路徑字串、沒有動態授權，能不能
+// 讀完全由 capabilities/default.json 的靜態 scope 決定；而「選擇檔案」按鈕走
+// dialog，插件在選中當下 allow_file，不受該 scope 限制，所以那是唯一確定
+// 可繞過的替代路徑，MUST 在訊息裡指出來。
+//
+// 措辭 MUST NOT 叫使用者「把資料夾搬到某幾個位置」：讀取 scope 是 `**`
+// （2026-08-17 決定，理由見 app-shell spec「檔案存取範圍」），沒有位置白名單
+// 這回事，那樣寫是錯的引導。`**` 之下仍可能出現此類錯誤，已知成因是 Tauri 的
+// glob 不匹配 leading dot（2026-08-13 傷疤），那是 App 該自己跳過的路徑而非
+// 使用者能修的，所以措辭只描述現象並給替代路徑，不歸咎使用者的檔案擺放。
+//
+// 判別字串取自 2026-08-13 實機錯誤原文（docs/verification/
+// cpap_dotfile_scope_fix.md）：
+//   forbidden path: <路徑>, maybe it is not allowed on the scope for
+//   `allow-stat` permission in your capability file
+// 兩段特徵任一命中即可，權限名（allow-stat／allow-read-dir…）隨呼叫點不同，
+// MUST NOT 綁定特定權限名。
+export function readFailureMessage(raw) {
+  if (/forbidden path:|not allowed on the scope/i.test(raw)) {
+    return "系統擋住了對這個位置的讀取，資料庫未寫入任何資料。"
+      + "請改用「選擇檔案」按鈕挑同一個來源再試一次。";
+  }
+  return "無法讀取這個來源，資料庫未寫入任何資料。";
+}
+
 export function friendlyError(err) {
   const raw = String(err?.message || err);
   if (/歸屬成員/.test(raw)) {

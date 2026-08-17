@@ -2,7 +2,9 @@
 
 ## Purpose
 
-TBD - created by archiving change 'tauri-desktop-app'. Update Purpose after archive.
+桌面應用的外殼與啟動鏈：Tauri 應用的基本規範、資料庫定位與首次啟動、
+knowledge 資源隨 bundle 出貨，以及雙平台建置與 CI 的零個資紀律
+（change tauri-desktop-app，2026-08-10）。
 
 ## Requirements
 
@@ -133,4 +135,96 @@ code:
   - .github/workflows/release.yml
   - .github/workflows/app-build.yml
   - scripts/verify_macos_signing.sh
+-->
+
+---
+### Requirement: 檔案存取範圍
+
+寫入類權限 MUST 只開放 `$APPDATA`（設定檔與藥品快取）。匯出 HTML 與資料庫
+檔寫的是使用者在儲存對話框選定的路徑，由 dialog 插件在選檔當下動態授權，
+MUST NOT 為此擴大靜態寫入範圍。
+
+**讀取類權限 MUST 維持不限定位置（`**`），MUST NOT 改為位置白名單。**
+
+理由：本 App 離線處理本機檔案，使用者主動把來源拖入視窗，該動作本身就是
+授權的表示。位置白名單等於規定使用者的檔案要放在哪幾個資料夾，把假設性的
+安全成本轉嫁給每個人的檔案組織習慣，而那不是本 App 該規定的事。
+
+收窄也無法達成其表面目的，2026-08-17 實測為證：把讀取九項由 `**` 改為
+「下載／桌面／文件匣／`/Volumes`」白名單後，範圍外路徑（`~/Pictures`）
+**仍可讀取**（`read_dir` 成功、走到判型失敗），而範圍內的讀卡機掛載磁碟
+**反而拖不進去**。該擋的沒擋、該通的通不了，兩頭皆錯。防線在模型不正確時
+上線，比不上線更危險。
+
+威脅模型的前提也不成立：可濫用讀取範圍的路徑需要先有 script 注入，而
+2026-08-17 已逐處驗證 App shell 的 `innerHTML` 組裝（`history.js`、
+`main.js`、`profile_manager.js`，含檔名、成員名與各類訊息）全數經過
+`esc()`，檢視層走 preact/htm 自動轉義，且無 `eval`／`new Function`、
+前端不載入任何遠端資源。此結論 MUST 於新增 `innerHTML` 組裝點時重驗。
+
+拖放與選檔的授權機制不同，這是理解上述判斷的前提，MUST 記載：選檔按鈕走
+dialog，插件在選中當下 `allow_file` 動態授權，不受靜態 scope 約束；拖放
+（`tauri://drag-drop`）只取得路徑字串、無任何動態授權，能否讀取完全由靜態
+scope 決定。而 CPAP 整張記錄卡與 Apple 匯出資料夾只能經拖放匯入。
+
+fs scope 拒絕的錯誤 MUST 轉為畫面上的訊息，MUST NOT 成為未捕捉的 rejection
+（那會使拖入毫無反應）。訊息 MUST 指出「改用選擇檔案按鈕」這條確定可行的
+替代路徑，且 MUST NOT 要求使用者搬移資料夾到特定位置（讀取範圍是 `**`，
+沒有位置白名單，那是錯誤的引導）。
+
+#### Scenario: 從任意位置拖入來源
+- **WHEN** 使用者從家目錄以外的任意位置（外接磁碟、記錄卡掛載點、
+  自訂資料夾）拖入受支援的來源
+- **THEN** 匯入正常進行，不因來源位置被拒絕
+
+#### Scenario: 讀取被系統拒絕時的呈現
+- **WHEN** 讀取路徑遭 fs scope 拒絕（例如 Tauri glob 不匹配 leading dot
+  的路徑）
+- **THEN** 畫面顯示錯誤卡並指出可改用選擇檔案按鈕，資料庫零寫入，
+  且訊息不要求使用者搬移資料夾
+
+<!-- @trace
+source: tauri-desktop-app
+updated: 2026-08-17
+code:
+  - app/src-tauri/capabilities/default.json
+  - app/src/ui/import_flow.js
+  - app/tests/adapters/edge_cases.test.mjs
+  - docs/verification/cpap_dotfile_scope_fix.md
+  - docs/verification/viewer_history_refinement.md
+-->
+
+---
+### Requirement: 內容安全政策
+
+`tauri.conf.json` 的 `app.security.csp` MUST 設定，MUST NOT 為 `null`。
+
+`connect-src` MUST 限制為 `'self'` 與 Tauri IPC 來源：這是本 App 最關鍵的
+一條，健康資料在任何注入情境下都不得被送出本機。`form-action` MUST 為
+`'none'`、`object-src` MUST 為 `'none'`、`base-uri` MUST 為 `'self'`。
+
+`script-src` 與 `style-src` MUST 保留 `'unsafe-inline'`：檢視層以
+`iframe srcdoc` 承載單檔自足的 HTML（inline 一切是它的設計前提，見
+`dashboard-generator` 的「單檔自足」），而 srcdoc 繼承父文件的 CSP，禁止
+inline 會使四個分頁完全失效。要移除它必須先讓 assemble 對 srcdoc 注入
+nonce，屬獨立變更，MUST NOT 在未做該項的情況下逕行移除。
+
+CSP 變更 MUST 配實機走查，MUST NOT 僅以「前端未載入遠端資源」推論無破壞：
+srcdoc 這個破壞點不會出現在任何靜態掃描裡。走查 MUST 涵蓋四個分頁的內容
+顯示與 iframe 內的互動（全文搜尋、趨勢區間切換）。
+
+#### Scenario: 檢視層在 CSP 下維持完整功能
+- **WHEN** 設定 CSP 後開啟資料檢視
+- **THEN** 四個分頁正常顯示內容，全文搜尋與趨勢區間切換可用
+
+#### Scenario: 資料不得送出本機
+- **WHEN** 頁面內任何程式碼嘗試對外部網域發出 fetch／XHR／WebSocket
+- **THEN** 該連線被 CSP 阻擋
+
+<!-- @trace
+source: tauri-desktop-app
+updated: 2026-08-17
+code:
+  - app/src-tauri/tauri.conf.json
+  - docs/verification/viewer_history_refinement.md
 -->
