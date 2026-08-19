@@ -24,6 +24,8 @@ const OUT_DIR = process.argv[2] || path.join(tmpdir(), "hwb-demo");
 const DRUG_CACHE = path.join(REPO, "app/src-tauri/resources/drug_items.sqlite");
 const LAB_ENTRIES = JSON.parse(
   readFileSync(path.join(REPO, "app/src/knowledge/labs.json"), "utf-8"));
+const SE_ENTRIES = JSON.parse(
+  readFileSync(path.join(REPO, "app/src/knowledge/side_effects.json"), "utf-8"));
 // 固定「今天」，讓產出可重現（畫面上的「資料截至」也跟著固定）
 const TODAY = "2026-08-12";
 
@@ -152,6 +154,11 @@ const LABS = [
   ["ALT", "GPT(ALT)", 28, 9, "[0-40]", "U/L", 0],
   ["Lymphocyte", "LYMPHOCYTE", 31.5, 4.2, "[20-45]", "%", 0],
   ["eGFR (CKD-EPI)", "eGFR", 79, 6, "[90-]", "mL/min/1.73m2", -0.9],
+  // 血糖與血脂：基準值刻意超標，用來檢視參考值灰帶在超標數據下的呈現
+  ["Glucose", "GLUCOSE(血糖)", 142, 18, "[70-100]", "mg/dL", 2],
+  ["Cholesterol", "T-CHOL(總膽固醇)", 248, 12, "[130-200]", "mg/dL", 1],
+  ["Triglyceride", "TG(三酸甘油脂)", 218, 25, "[50-150]", "mg/dL", 3],
+  ["LDL", "LDL(低密度脂蛋白)", 168, 10, "[60-130]", "mg/dL", 1.5],
 ];
 const labDates = Array.from({ length: 10 }, (_, q) => iso(addDays(START, q * 108 + 12)));
 const labRows = [];
@@ -214,7 +221,7 @@ await d.batchInsert("apple_records",
 
 // ---------- 組 payload 並產出示範 HTML ----------
 const payload = await buildPayload(d, { profileId: pid, knowledgeEntries: LAB_ENTRIES,
-  drugCachePath: DRUG_CACHE, today: TODAY });
+  sideEffectsEntries: SE_ENTRIES, drugCachePath: DRUG_CACHE, today: TODAY });
 await d.close();
 
 const assets = {

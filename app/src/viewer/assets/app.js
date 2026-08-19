@@ -30,6 +30,21 @@
   const typeColor = (t) => (TYPE_META[t] || [t, "var(--ink2)"])[1];
   const medKey = (m) => m.order_code || m.order_name;
 
+  /* 仿單連結：健保用藥品項檔的「藥品代碼超連結」目前指向食藥署舊版許可證
+     查詢系統（DRPIQ1000Result?licId=），該系統改版後此格式已失效（HTTP 404）。
+     失效時改提供食藥署仿單查詢平台入口（可輸入藥名或成分查詢，含適應症與
+     副作用）；未來健保署若更新連結格式，即自動恢復直接連結。 */
+  const LEAFLET_DEAD = /DRPIQ1000Result\?licId=/;
+  const leafletHref = (url) =>
+    LEAFLET_DEAD.test(url || "") ? "https://mcp.fda.gov.tw/" : url;
+  const leafletTitle = (url) =>
+    LEAFLET_DEAD.test(url || "")
+      ? "健保品項檔的仿單連結已失效，此為食藥署仿單查詢平台（可輸入藥名或成分查詢）"
+      : "適應症與副作用見官方仿單";
+  // 品項檔成分名（含劑量）→ 副作用知識鍵（純成分名，與 fetch_side_effects 同規則）
+  const sideKey = (ingredient) =>
+    (ingredient || "").split("(")[0].trim().split(/\s+/)[0].toUpperCase();
+
   /* 醫令分類：西醫藥品（品項檔命中）/ 中醫用藥 / 診療項目與其他 */
   function medCategory(m) {
     if (m.drug_zh) return "drug";
@@ -216,8 +231,13 @@
     const xlab = timeTicks(dom.tMin, dom.tMax).map((tk) =>
       html`<text x=${PL + ((tk.t - dom.tMin) / span) * PW} y=${H - 8}
         class="ax" text-anchor="middle">${tk.label}</text>`);
-    const band = refRange ? html`<rect x=${PL} y=${y(refRange[1])} width=${PW}
-        height=${Math.max(y(refRange[0]) - y(refRange[1]), 1)} class="refband" />` : null;
+    const band = refRange ? html`<g>
+      <rect x=${PL} y=${y(refRange[1])} width=${PW}
+        height=${Math.max(y(refRange[0]) - y(refRange[1]), 1)} class="refband" />
+      <line x1=${PL} y1=${y(refRange[1])} x2=${W - PR} y2=${y(refRange[1])} class="refedge" />
+      <line x1=${PL} y1=${y(refRange[0])} x2=${W - PR} y2=${y(refRange[0])} class="refedge" />
+      <text x=${PL + 4} y=${y(refRange[1]) + 12} class="ax">參考 ${refRange[0]}–${refRange[1]}</text>
+    </g>` : null;
     return html`<div class="chartwrap"><svg viewBox="0 0 ${W} ${H}" width=${W} role="img">
       ${band}${grid}${xlab}
       ${drawn.map((s, si) => {
@@ -411,6 +431,7 @@
     const [type, setType] = useState("");
     const [fac, setFac] = useState("");
     const [open, setOpen] = useState((focus && focus.enc) || null);
+    const [openSe, setOpenSe] = useState(null);
     // 院所選單跟著已選類型連動
     const facilities = useMemo(
       () => [...new Set(DATA.encounters.filter((e) => !type || e.type === type)
@@ -481,8 +502,17 @@
               return html`<tr><td>${m.drug_zh || m.order_name}${m.tooth_name ? `（${m.tooth_name}）` : ""}</td>
                 <td class="dt">${m.ingredient || ""}</td>
                 <td class="num">${m.total_qty ?? ""}</td><td class="num">${m.days_supply ?? ""}</td>
-                <td>${m.leaflet_url ? html`<a href=${m.leaflet_url} target="_blank" rel="noopener">仿單↗</a>` : ""}</td></tr>`; })}
+                <td>${m.leaflet_url ? html`<a href=${leafletHref(m.leaflet_url)} target="_blank" rel="noopener"
+                  title=${leafletTitle(m.leaflet_url)}>仿單↗</a>` : ""}
+                ${(() => { const se = m.ingredient ? DATA.side_effects[sideKey(m.ingredient)] : null;
+                  return se ? html`<button class="se-toggle"
+                      onClick=${() => setOpenSe(openSe === m.id ? null : m.id)}>
+                    ${openSe === m.id ? "副作用 ▴" : "副作用 ▾"}</button>` : ""; })()}
+                </td></tr>`; })}
           </table>`}
+          ${(() => { const m = openSe != null ? medById[openSe] : null;
+            const se = m && m.ingredient ? DATA.side_effects[sideKey(m.ingredient)] : null;
+            return se ? html`<${SeBox} se=${se} />` : ""; })()}
           <p class="src">來源：${e.source_file}［${e.section}#${e.source_index}］
             ${e.copay != null ? ` ｜ 部分負擔 ${e.copay} 元 ｜ 健保 ${e.nhi_points} 點` : ""}</p>
         </div>`}
@@ -494,6 +524,18 @@
 
   /* ---------- 用藥（分類＋可展開處方時間軸） ---------- */
   const MED_CATS = [["drug", "藥品"], ["tcm", "中醫用藥"], ["order", "診療項目與其他"]];
+
+  // 副作用知識區塊（KingNet 藥典）：用藥分頁與就醫時間軸共用
+  function SeBox({ se }) {
+    return html`<div class="se-box">
+      <div><b>適應症</b><p>${se.indication || "—"}</p></div>
+      <div><b>副作用</b><p>${se.side_effects || "—"}</p></div>
+      ${se.warnings ? html`<div><b>警示資訊</b><p>${se.warnings}</p></div>` : ""}
+      ${se.contraindications ? html`<div><b>使用禁忌</b><p>${se.contraindications}</p></div>` : ""}
+      <p class="note">資料來源：${se.source_name}（引用日期 ${se.cited_date}）
+        <a href=${se.source_url} target="_blank" rel="noopener">來源頁↗</a></p>
+    </div>`;
+  }
 
   function MedGroup({ g, open, onToggle, go }) {
     const m = g.m;
@@ -509,7 +551,10 @@
         ${!m.drug_zh && html`<p class="note"><span class="flag">品項檔未對照</span>
           顯示原始醫囑名稱（診療項目與中藥不在西藥品項檔範圍）</p>`}
         ${m.ingredient && html`<p class="note">成分：${m.ingredient}
-          ${m.leaflet_url && html`｜<a href=${m.leaflet_url} target="_blank" rel="noopener">仿單↗</a>`}</p>`}
+          ${m.leaflet_url && html`｜<a href=${leafletHref(m.leaflet_url)} target="_blank" rel="noopener"
+            title=${leafletTitle(m.leaflet_url)}>仿單↗</a>`}</p>`}
+        ${(() => { const se = m.ingredient ? DATA.side_effects[sideKey(m.ingredient)] : null;
+          return se ? html`<${SeBox} se=${se} />` : ""; })()}
         <${DispenseTimeline} items=${g.items} />
         <table><tr><th>日期</th><th>院所</th><th>總量</th><th>天數</th><th></th></tr>
           ${g.items.map((x) => html`<tr class="rowlink"
@@ -551,7 +596,7 @@
       </div>
       <p class="note">藥品資訊來自健保用藥品項檔（版本
         ${DATA.meta.drug_cache ? DATA.meta.drug_cache.updated_at : "未建快取"}）；
-        點列展開處方時間軸。</p>
+        副作用與警語已依藥典整理於下方；點列展開處方時間軸。</p>
       ${byCat(cat).map((g) => html`<${MedGroup} g=${g} open=${openKey === g.key} go=${go}
         onToggle=${() => setOpenKey(openKey === g.key ? null : g.key)} />`)}
     </section>`;

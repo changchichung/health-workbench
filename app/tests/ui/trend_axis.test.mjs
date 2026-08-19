@@ -396,3 +396,25 @@ test("總覽血壓卡顯示量測日期（避免陳舊數值看似當前）", as
   assert.match(root.textContent, /mmHg｜\d{4}-\d{2}-\d{2}/,
     "血壓卡應在單位旁顯示最近量測日期");
 });
+
+test("檢驗圖灰帶有上下限虛線與圖上參考值標籤", async () => {
+  const { root, flush } = await trends(await shapePayload());
+  btn(root, "全部").dispatch("click");
+  await flush();
+  const lab = svgs(root).find((s) => legend(s).some((t) => t.textContent.startsWith("Creat")));
+  assert.ok(lab, "找不到檢驗趨勢圖");
+  const band = findAll(lab, (e) => e.localName === "rect"
+    && String(e.attributes.class || "").includes("refband"));
+  assert.equal(band.length, 1, "應有一條參考值灰帶");
+  const edges = findAll(lab, (e) => e.localName === "line"
+    && String(e.attributes.class || "").includes("refedge"));
+  assert.equal(edges.length, 2, "灰帶上下邊界各應有一條虛線");
+  const [top, bottom] = edges.map((l) => num(l, "y1")).sort((a, b) => a - b);
+  assert.equal(top, num(band[0], "y"), "上邊界虛線應對齊灰帶上緣");
+  assert.equal(bottom, num(band[0], "y") + num(band[0], "height"),
+    "下邊界虛線應對齊灰帶下緣");
+  const refLabel = inSvg(lab, "text").find((t) => t.textContent.includes("參考"));
+  assert.ok(refLabel, "圖上應標示參考值數值");
+  assert.equal(refLabel.textContent, "參考 0.7–1.3",
+    "參考值標籤應為「參考 0.7–1.3」");
+});

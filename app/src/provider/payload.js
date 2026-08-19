@@ -132,10 +132,11 @@ async function dailyMeasureSeries(driver, typeZh, profileId) {
   });
 }
 
-// knowledgeEntries: labs.json 條目；drugCachePath: drug_items.sqlite 路徑（可 null）
-// profileId 必填（app-viewer spec：provider 僅回傳該成員資料）
+// knowledgeEntries: labs.json 條目；sideEffectsEntries: side_effects.json 條目；
+// drugCachePath: drug_items.sqlite 路徑（可 null）；profileId 必填（app-viewer
+// spec：provider 僅回傳該成員資料）
 export async function buildPayload(driver, { profileId, knowledgeEntries,
-  drugCachePath, today }) {
+  sideEffectsEntries, drugCachePath, today }) {
   const profileRow = await requireProfile(driver, profileId);
   const encounters = (await driver.select(`
     SELECT e.id, e.type, e.date, e.facility_name, e.dx_code, e.dx_name,
@@ -196,6 +197,18 @@ export async function buildPayload(driver, { profileId, knowledgeEntries,
     };
   }
 
+  // 藥品副作用知識（KingNet 藥典，keyed by 純成分名）；與 embed.py 的
+  // side_effects block 逐句對應（provider_parity 是全等比對）
+  const side_effects = {};
+  for (const e of sideEffectsEntries || []) {
+    side_effects[e.ingredient] = {
+      indication: e.indication, side_effects: e.side_effects,
+      warnings: e.warnings, contraindications: e.contraindications,
+      source_name: e.source_name, source_url: e.source_url,
+      cited_date: String(e.cited_date),
+    };
+  }
+
   const activity = {};
   for (const t of COUNTING_TYPES) {
     activity[t] = await dailyCountingSeries(driver, t, profileId);
@@ -246,6 +259,7 @@ export async function buildPayload(driver, { profileId, knowledgeEntries,
     immunizations,
     nhi_body: nhiBody,
     knowledge,
+    side_effects,
     activity,
     measures,
     workouts,

@@ -16,6 +16,8 @@ import { assemble, validateShape, toEmbeddedJson } from "../../src/provider/asse
 const REPO = new URL("../../..", import.meta.url).pathname;
 const LAB_ENTRIES = JSON.parse(
   readFileSync(new URL("../../src/knowledge/labs.json", import.meta.url), "utf-8"));
+const SE_ENTRIES = JSON.parse(
+  readFileSync(new URL("../../src/knowledge/side_effects.json", import.meta.url), "utf-8"));
 
 // 建一個含兩來源的庫（檔案落地，Python 端要讀同一顆）
 async function buildDb(dbPath) {
@@ -55,7 +57,8 @@ test("provider 同構：JS payload 與 Python build_payload 數值全等", async
   const dbPath = path.join(tmp, "db.sqlite");
   const d = await buildDb(dbPath);
   const js = await buildPayload(d, { profileId: d.pid,
-    knowledgeEntries: LAB_ENTRIES, drugCachePath: null, today: "2026-08-09" });
+    knowledgeEntries: LAB_ENTRIES, sideEffectsEntries: SE_ENTRIES,
+    drugCachePath: null, today: "2026-08-09" });
   await d.close();
   assert.deepEqual(validateShape(js), []);
   const py = pyPayload(dbPath);
@@ -67,7 +70,8 @@ test("匯出同構：assemble 輸出的嵌入資料與 hwb rebuild 產出全等"
   const dbPath = path.join(tmp, "db.sqlite");
   const d = await buildDb(dbPath);
   const js = await buildPayload(d, { profileId: d.pid,
-    knowledgeEntries: LAB_ENTRIES, drugCachePath: null, today: "2026-08-09" });
+    knowledgeEntries: LAB_ENTRIES, sideEffectsEntries: SE_ENTRIES,
+    drugCachePath: null, today: "2026-08-09" });
   await d.close();
 
   const assets = {

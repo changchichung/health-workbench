@@ -7,11 +7,15 @@
 """
 import json
 from datetime import date
+from pathlib import Path
 
 from src.knowledge.drugs import DrugLookup
 from src.knowledge.labs import load_entries
 
 TREND_EXCLUDE = "quality_flags NOT LIKE '%epoch_placeholder_date%' AND quality_flags NOT LIKE '%out_of_range%'"
+
+SIDE_EFFECTS_JSON = Path(__file__).resolve().parent.parent.parent \
+    / "app/src/knowledge/side_effects.json"
 
 # 計數型（日加總取最大）vs 量測型（日中位數）
 COUNTING_TYPES = ["步數", "步行跑步距離", "騎車距離", "爬樓層數", "活動能量", "基礎能量"]
@@ -102,6 +106,16 @@ def build_payload(store, db_path):
         "source_url": e["source_url"], "cited_date": str(e["cited_date"])}
         for e in load_entries()}
 
+    # --- knowledge 條目（藥品副作用，KingNet 藥典；keyed by 純成分名） ---
+    # 與 app/src/provider/payload.js 的 side_effects block 逐句對應
+    # （provider_parity 是全等比對）
+    side_effects = {e["ingredient"]: {
+        "indication": e["indication"], "side_effects": e["side_effects"],
+        "warnings": e["warnings"], "contraindications": e["contraindications"],
+        "source_name": e["source_name"], "source_url": e["source_url"],
+        "cited_date": str(e["cited_date"])}
+        for e in json.loads(SIDE_EFFECTS_JSON.read_text(encoding="utf-8"))}
+
     # --- 活動層（日聚合） ---
     activity = {t: daily_counting_series(store, t) for t in COUNTING_TYPES}
     measures = {t: daily_measure_series(store, t) for t in MEASURE_TYPES}
@@ -180,6 +194,7 @@ def build_payload(store, db_path):
         "immunizations": immunizations,
         "nhi_body": nhi_body,
         "knowledge": knowledge,
+        "side_effects": side_effects,
         "activity": activity,
         "measures": measures,
         "workouts": workouts,
@@ -188,7 +203,7 @@ def build_payload(store, db_path):
 
     sizes = {}
     medical_keys = ["encounters", "meds_by_enc", "medications", "labs", "reports",
-                    "immunizations", "nhi_body", "knowledge"]
+                    "immunizations", "nhi_body", "knowledge", "side_effects"]
     activity_keys = ["activity", "measures", "workouts"]
     for group, keys in [("medical", medical_keys), ("activity", activity_keys),
                         ("meta", ["meta"])]:

@@ -36,3 +36,7 @@ docs/verification/
 docs/spikes/
 docs/*handoff*.md
 docs/20260808_phase0_findings.md
+
+# 工具產物（勿入庫）
+.omo/
+.playwright-mcp/

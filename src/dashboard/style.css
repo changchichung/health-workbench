@@ -5,6 +5,7 @@
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
   --bg: #f2f2f7; --card: #ffffff; --ink: #1c1c1e; --ink2: #8e8e93;
   --line: #e5e5ea; --band: rgba(142, 142, 147, 0.12);
+  --refedge: rgba(142, 142, 147, 0.45);
   --good: #34c759; --warn: #eb6834; --accent: #007aff;
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
@@ -13,6 +14,7 @@
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --bg: #000000; --card: #1c1c1e; --ink: #ffffff; --ink2: #98989e;
     --line: #38383a; --band: rgba(152, 152, 158, 0.16);
+    --refedge: rgba(152, 152, 158, 0.55);
     --good: #30d158; --warn: #d95926; --accent: #0a84ff;
     --shadow: none;
   }
@@ -27,6 +29,15 @@ h1 { font-size: 26px; font-weight: 800; margin: 4px 0 2px; letter-spacing: -0.3p
 h2 { font-size: 1.02em; margin: 1.8em 0 0.6em; font-weight: 700; }
 .note { color: var(--ink2); font-size: .84em; }
 .know { border-left: 3px solid var(--line); padding-left: 10px; font-size: .9em; }
+/* 用藥副作用知識（KingNet 藥典，見 side_effects.json） */
+.se-box { margin: 10px 0 6px; padding: 8px 12px; background: var(--band);
+  border-radius: 8px; }
+.se-box b { display: block; margin-top: 6px; font-size: .9em; }
+.se-box p { margin: 2px 0 6px; font-size: .88em; line-height: 1.55; }
+.se-box .note { margin-top: 4px; }
+/* 時間軸藥品行的副作用切換鈕 */
+.se-toggle { margin-left: 6px; font: inherit; font-size: .84em;
+  color: var(--accent); background: none; border: none; cursor: pointer; padding: 0; }
 .src, .dt { color: var(--ink2); font-size: .85em; }
 .flag { color: var(--s2); font-size: .75em; border: 1px solid var(--s2);
   border-radius: 4px; padding: 0 4px; }
@@ -94,6 +105,8 @@ th { color: var(--ink2); font-weight: 500; font-size: .85em; }
 .grid { stroke: var(--line); stroke-width: 1; }
 .ax { fill: var(--ink2); font-size: 11px; }
 .refband { fill: var(--band); }
+/* 參考值灰帶的上下邊界虛線：讓上下限在圖上可精確對齊 */
+.refedge { stroke: var(--refedge); stroke-width: 1; stroke-dasharray: 4 3; }
 .report { white-space: pre-wrap; font: .85em/1.5 ui-monospace, monospace;
   background: var(--band); padding: 10px; border-radius: 10px; overflow-x: auto; }
 a { color: var(--accent); }
