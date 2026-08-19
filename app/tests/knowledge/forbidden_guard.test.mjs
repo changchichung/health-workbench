@@ -64,3 +64,16 @@ test("出貨文案與檢視層文案：CPAP 指標只顯示不解讀", () => {
   const hits = INTERPRETIVE.filter(w => app.includes(w));
   assert.deepEqual(hits, [], `檢視層出現解讀性用語：${hits.join("、")}`);
 });
+
+// payload 參數傳遞守衛：buildPayload 的 sideEffectsEntries 若漏傳，App 內
+// 副作用知識庫會靜默變空（2026-08-19 實機走查：build 成功但看不到副作用）。
+test("App 端 buildPayload 呼叫帶 sideEffectsEntries（檢視層與入口各一處）", () => {
+  const viewer = readFileSync(path.join(APP_SRC, "ui/viewer.js"), "utf-8");
+  assert.match(viewer, /buildPayload\(driver, \{\s*profileId,\s*knowledgeEntries: labEntries,\s*sideEffectsEntries,/,
+    "viewer.js 的 buildPayload 呼叫漏傳 sideEffectsEntries，App 內副作用會消失");
+  const main = readFileSync(path.join(APP_SRC, "ui/main.js"), "utf-8");
+  assert.match(main, /createViewer\(\{\s*getDriver: \(\) => app\.driver,[\s\S]*?sideEffectsEntries,/,
+    "main.js 的 createViewer 呼叫漏傳 sideEffectsEntries，檢視層收不到副作用資料");
+  assert.match(main, /loadSideEffectEntries\(\)/,
+    "main.js 缺少 side_effects.json 載入（loadSideEffectEntries）");
+});

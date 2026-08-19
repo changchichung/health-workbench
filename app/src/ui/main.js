@@ -206,6 +206,11 @@ async function loadLabEntries() {
   return res.json();
 }
 
+async function loadSideEffectEntries() {
+  const res = await fetch("./knowledge/side_effects.json");
+  return res.json();
+}
+
 function dialogOpen(opts) {
   const dialog = window.__TAURI__.dialog;
   const open = dialog.open || dialog.default?.open;
@@ -221,6 +226,7 @@ function setTab(name) {
 
 async function wireUi() {
   const labEntries = await loadLabEntries();
+  const sideEffectsEntries = await loadSideEffectEntries();
   document.getElementById("tab-btn-import").addEventListener("click", () => setTab("import"));
   document.getElementById("tab-btn-viewer").addEventListener("click", () => setTab("viewer"));
   app.viewer = createViewer({
@@ -229,6 +235,7 @@ async function wireUi() {
     getProfileId: () => app.currentProfileId,
     getExportStartDir: () => dialogStartDir("export"),
     labEntries,
+    sideEffectsEntries,
     onNotify: notify,
   });
   app.history = createHistory({
