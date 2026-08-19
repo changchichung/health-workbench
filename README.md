@@ -1,5 +1,11 @@
 <div align="center">
 
+# 我改了哪些
+### 加入藥品副作用資料
+在資料檢視-->用藥
+點開藥品名稱，就會顯示網路上找到的副作用資料
+![](http://i.excen.one/u/Lw1vPr.png)
+
 # HealthWorkbench：個人健康資料工作台
 
 [![Release](https://img.shields.io/github/v/release/notoriouslab/health-workbench?style=flat-square)](https://github.com/notoriouslab/health-workbench/releases)
